@@ -16,8 +16,29 @@ function fatal(msg) {
   el.style.display = 'flex';
   el.textContent = '场景初始化出错了,请截图发给我:\n\n' + msg;
 }
-addEventListener('error', (e) => fatal(e.message));
-addEventListener('unhandledrejection', (e) => fatal(String(e.reason)));
+let booted = false;
+addEventListener('error', (e) => {
+  if (/pointer.?lock|WrongDocument/i.test(String(e.message))) return; // 指针锁定失败非致命
+  if (!booted) fatal(e.message);
+});
+addEventListener('unhandledrejection', (e) => {
+  const msg = String(e.reason?.message || e.reason);
+  if (/pointer.?lock|WrongDocument/i.test(msg)) return;
+  if (!booted) fatal(msg);
+});
+
+// 安全请求指针锁定(部分环境会拒绝,静默忽略)
+function tryPointerLock(el) {
+  try {
+    const p = el.requestPointerLock?.({ unadjustedMovement: true });
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch {
+    try {
+      const p = el.requestPointerLock?.();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch { /* 环境不支持,忽略 */ }
+  }
+}
 
 // 治愈调色:阴影偏青 + 轻饱和 + 暖高光 + 轻暗角
 const grade = Fn(([c]) => {
@@ -83,8 +104,9 @@ async function boot() {
         .then(() => screen.orientation?.lock?.('landscape').catch(() => {}))
         .catch(() => {});
     } else {
-      renderer.domElement.requestPointerLock?.();
+      tryPointerLock(renderer.domElement);
     }
+    booted = true;
   };
 
   // 后处理:HDR -> Bloom -> 治愈调色

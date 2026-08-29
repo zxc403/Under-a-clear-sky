@@ -35,7 +35,12 @@ export class Input {
       }
     });
     canvas.addEventListener('click', () => {
-      if (!this.isTouch && !this.locked) canvas.requestPointerLock?.();
+      if (!this.isTouch && !this.locked) {
+        try {
+          const p = canvas.requestPointerLock?.();
+          if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch { /* 环境不支持指针锁定,忽略 */ }
+      }
     });
     document.addEventListener('contextmenu', (e) => e.preventDefault());
     if (this.isTouch) this._buildTouchUI();
