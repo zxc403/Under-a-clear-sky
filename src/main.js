@@ -22,7 +22,11 @@ function _pushErr(m) {
 const _cerr = console.error.bind(console);
 console.error = (...a) => { _pushErr(a.map(x => x?.stack || x?.message || String(x)).join(' ')); _cerr(...a); };
 const _cwarn = console.warn.bind(console);
-console.warn = (...a) => { _pushErr('[warn] ' + a.map(x => x?.message || String(x)).join(' ')); _cwarn(...a); };
+console.warn = (...a) => {
+  const msg = a.map(x => x?.message || String(x)).join(' ');
+  if (/Clock|deprecat/i.test(msg)) return _cwarn(...a); // 无害弃用警告不上屏
+  _pushErr('[warn] ' + msg); _cwarn(...a);
+};
 
 function fatal(msg) {
   const el = document.getElementById('fatal');

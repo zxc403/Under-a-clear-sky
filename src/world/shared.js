@@ -66,8 +66,8 @@ export const skyColor = Fn(([dir]) => {
   const n1 = fbm(cp);
   const detail = fbm(cp.mul(2.1).add(vec2(7.7, 3.1)));
   const densBase = n1.mul(0.75).add(detail.mul(0.25));
-  const cov = smoothstep(0.47, 0.63, densBase);
-  const horizonFade = smoothstep(0.015, 0.08, y);
+  const cov = smoothstep(0.42, 0.60, densBase);
+  const horizonFade = smoothstep(0.008, 0.06, y);
 
   // 前向散射银边:朝太阳方向偏移采样,云缘被阳光打亮
   const sunOff = vec2(sun.x, sun.z).normalize().mul(0.07);
