@@ -60,24 +60,23 @@ export const skyColor = Fn(([dir]) => {
   const disk = smoothstep(0.9993, 0.99985, sd).mul(26.0);
   col = col.add(vec3(1.0, 0.95, 0.85).mul(disk));
 
-  // 大积云层:透视投影到云平面,fbm 密度场,云底平、云顶蓬松
-  const py = max(y, 0.02);
-  const persp = d.xz.div(py.mul(2.2).add(0.22));
-  const cuv = persp.mul(1.35).add(vec2(timeU.mul(0.006), timeU.mul(0.0025)));
-  const n1 = fbm(cuv.mul(0.45));
-  const detail = fbm(cuv.mul(1.55).add(vec2(7.7, 3.1)));
-  const densBase = n1.mul(0.85).add(detail.mul(0.30)).sub(0.10);
-  const cov = smoothstep(0.40, 0.66, densBase);
-  const horizonFade = smoothstep(0.006, 0.05, y);
+  // 大积云层:投影到固定云平面,覆盖整片天空(上一版投影在天顶退化+阈值过严导致无云)
+  const py = max(y, 0.03);
+  const cp = d.xz.div(py.add(0.15)).mul(0.42).add(vec2(timeU.mul(0.004), timeU.mul(0.0016)));
+  const n1 = fbm(cp);
+  const detail = fbm(cp.mul(2.1).add(vec2(7.7, 3.1)));
+  const densBase = n1.mul(0.75).add(detail.mul(0.25));
+  const cov = smoothstep(0.47, 0.63, densBase);
+  const horizonFade = smoothstep(0.015, 0.08, y);
 
   // 前向散射银边:朝太阳方向偏移采样,云缘被阳光打亮
-  const sunOff = vec2(sun.x, sun.z).normalize().mul(0.10);
-  const n2 = fbm(cuv.mul(0.45).add(sunOff));
+  const sunOff = vec2(sun.x, sun.z).normalize().mul(0.07);
+  const n2 = fbm(cp.add(sunOff));
   const lining = clamp(n1.sub(n2), 0.0, 1.0).mul(cov);
 
   const cloudLight = vec3(1.10, 1.07, 1.02);
   const cloudDark = vec3(0.62, 0.71, 0.85);
-  let ccol = mix(cloudLight, cloudDark, smoothstep(0.52, 0.95, densBase).mul(0.72));
+  let ccol = mix(cloudLight, cloudDark, smoothstep(0.55, 0.95, densBase).mul(0.72));
   ccol = ccol.add(vec3(1.0, 0.82, 0.55).mul(lining.mul(1.7).mul(pow(sd, 2.0).add(0.25))));
 
   const cmask = cov.mul(horizonFade);

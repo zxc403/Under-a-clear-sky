@@ -9,6 +9,21 @@ import { Input } from './controls/input.js';
 import { Player } from './controls/player.js';
 import { HUD } from './ui/hud.js';
 
+// 调试着色器编译错误捕获:three 的节点编译错误走 console.error,直接显示到屏幕上
+const _errBox = document.createElement('div');
+_errBox.style.cssText = 'position:fixed;left:8px;bottom:8px;max-width:92vw;max-height:40vh;overflow:auto;z-index:99;background:rgba(120,0,0,.85);color:#fff;font:11px/1.5 monospace;padding:8px 10px;border-radius:6px;display:none;white-space:pre-wrap;';
+document.body.appendChild(_errBox);
+const _errs = [];
+function _pushErr(m) {
+  _errs.push(String(m).slice(0, 800));
+  _errBox.style.display = 'block';
+  _errBox.textContent = _errs.slice(0, 4).join('\n----\n');
+}
+const _cerr = console.error.bind(console);
+console.error = (...a) => { _pushErr(a.map(x => x?.stack || x?.message || String(x)).join(' ')); _cerr(...a); };
+const _cwarn = console.warn.bind(console);
+console.warn = (...a) => { _pushErr('[warn] ' + a.map(x => x?.message || String(x)).join(' ')); _cwarn(...a); };
+
 function fatal(msg) {
   const el = document.getElementById('fatal');
   el.style.display = 'flex';
