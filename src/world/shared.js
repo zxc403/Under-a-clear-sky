@@ -55,7 +55,7 @@ export const skyColor = Fn(([dir]) => {
   const warm = vec3(1.0, 0.86, 0.62);
   const glow = pow(sd, 420.0).mul(2.0).add(pow(sd, 32.0).mul(0.30));
   col = col.add(warm.mul(glow));
-  const haze = pow(sd, 3.0).mul(pow(clamp(1.0 - abs(y), 0.0, 1.0), 3.0)).mul(0.08);
+  const haze = pow(sd, 3.0).mul(pow(clamp(float(1.0).sub(abs(y)), 0.0, 1.0), 3.0)).mul(0.08);
   col = col.add(warm.mul(haze));
   const disk = smoothstep(0.9993, 0.99985, sd).mul(26.0);
   col = col.add(vec3(1.0, 0.95, 0.85).mul(disk));
