@@ -87,11 +87,7 @@ function makeWaterMaterial(withWaves) {
   const mat = new THREE.MeshBasicNodeMaterial();
   mat.fog = false;
   mat.colorNode = waterColor();
-  if (withWaves) {
-    mat.positionNode = positionLocal.add(
-      vec3(0.0, 0.0, waveParts(vec2(positionLocal.x, positionLocal.y), timeU).x)
-    );
-  }
+  // 顶点波浪位移暂时停用(排查水面不渲染),法线波纹在片元里仍工作
   return mat;
 }
 
