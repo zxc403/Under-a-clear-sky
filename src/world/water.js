@@ -41,7 +41,7 @@ const waterColor = Fn(() => {
   const n = waterNormal(pw.xz, t);
   const view = normalize(cameraPosition.sub(pw));
   const ndv = max(dot(view, n), 0.0);
-  const fres = float(0.03).add(pow(float(1.0).sub(ndv), 5.0).mul(0.97));
+  const fres = float(0.04).add(pow(float(1.0).sub(ndv), 5.0).mul(0.56));
 
   // 反射共享同一天空函数 → 水天一色
   const refl = reflect(view.negate(), n);
@@ -49,10 +49,10 @@ const waterColor = Fn(() => {
 
   // 深度渐变(由离岸距离伪造浅滩)
   const dist = pw.z.sub(WATER_EDGE_Z);
-  const shallow = float(1.0).sub(smoothstep(0.0, 16.0, dist));
-  const deep = vec3(0.035, 0.30, 0.52);
-  const midc = vec3(0.05, 0.47, 0.64);
-  const shal = vec3(0.23, 0.83, 0.80);
+  const shallow = float(1.0).sub(smoothstep(0.0, 26.0, dist));
+  const deep = vec3(0.03, 0.32, 0.55);
+  const midc = vec3(0.06, 0.55, 0.72);
+  const shal = vec3(0.20, 0.85, 0.78);
   let wcol = mix(deep, midc, smoothstep(0.0, 0.6, shallow));
   wcol = mix(wcol, shal, smoothstep(0.55, 1.0, shallow));
   const sand = vec3(0.76, 0.72, 0.55);
@@ -63,22 +63,22 @@ const waterColor = Fn(() => {
   // 太阳碎金(布林高光双峰)
   const hv = normalize(view.add(sunDirU));
   const ndh = max(dot(n, hv), 0.0);
-  const spec = pow(ndh, 480.0).mul(3.2).add(pow(ndh, 48.0).mul(0.22));
+  const spec = pow(ndh, 140.0).mul(1.5).add(pow(ndh, 28.0).mul(0.28));
   col = col.add(vec3(1.0, 0.9, 0.7).mul(spec));
 
   // 岸线泡沫:滚动波带 + 噪声破碎 + 贴岸白边
   const band = sin(dist.mul(1.8).sub(t.mul(1.6))).mul(0.5).add(0.5);
-  const fmask = float(1.0).sub(smoothstep(0.3, 5.0, dist));
+  const fmask = float(1.0).sub(smoothstep(0.3, 9.0, dist));
   const fn2 = fbm(pw.xz.mul(0.35).add(vec2(t.mul(0.10), t.mul(-0.06))));
   const foamBody = smoothstep(0.42, 0.78, band.mul(0.30).add(fn2.mul(0.62))).mul(fmask);
-  const edgeFoam = float(1.0).sub(smoothstep(0.0, 0.9, dist));
+  const edgeFoam = float(1.0).sub(smoothstep(0.0, 1.5, dist));
   const foam = clamp(foamBody.add(edgeFoam.mul(0.9)), 0.0, 1.0);
   col = mix(col, vec3(1.04), foam.mul(0.85));
 
   // 远方融入地平线的天空色(空气透视)
   const vd = normalize(pw.sub(cameraPosition));
   const hcol = skyColor(normalize(vec3(vd.x, 0.03, vd.z)));
-  col = mix(col, hcol, smoothstep(150.0, 900.0, pw.sub(cameraPosition).length()).mul(0.55));
+  col = mix(col, hcol, smoothstep(260.0, 1100.0, pw.sub(cameraPosition).length()).mul(0.5));
 
   return col;
 });

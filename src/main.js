@@ -95,6 +95,10 @@ async function boot() {
   const input = new Input();
   input.attach(renderer.domElement);
   const player = new Player(camera);
+  // 调试出生点:?spawn=beach(海滨步道)/?spawn=plaza(广场),便于快速验收
+  const sp = new URLSearchParams(location.search).get('spawn');
+  if (sp === 'beach') player.pos.set(0, 0, 30);
+  else if (sp === 'plaza') player.pos.set(0, 0, 44);
 
   hud.onEnter = () => {
     if (input.isTouch) {
