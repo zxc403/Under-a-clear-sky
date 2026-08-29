@@ -1,8 +1,6 @@
 // 晴空之下 · 氛围原型入口
 // WebGPURenderer(WebGPU 优先,自动/手动降级 WebGL2) + TSL 全节点着色
 import * as THREE from 'three/webgpu';
-import { pass, Fn, vec3, float, dot, mix, smoothstep, screenUV } from 'three/tsl';
-import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { SUN_DIR, timeU } from './world/shared.js';
 import { createSky } from './world/sky.js';
 import { createWater } from './world/water.js';
@@ -40,17 +38,17 @@ function tryPointerLock(el) {
   }
 }
 
-// 治愈调色:阴影偏青 + 轻饱和 + 暖高光 + 轻暗角
-const grade = Fn(([c]) => {
-  const lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  const shadowT = float(1.0).sub(smoothstep(0.0, 0.35, lum));
-  let gcol = c.add(vec3(0.0, 0.30, 0.55).mul(shadowT.mul(0.10)));
-  const lum2 = dot(gcol, vec3(0.2126, 0.7152, 0.0722));
-  gcol = mix(vec3(lum2), gcol, 1.07);
-  gcol = gcol.mul(mix(vec3(1.0), vec3(1.05, 1.0, 0.93), smoothstep(0.6, 1.6, lum2).mul(0.5)));
-  const vig = smoothstep(1.35, 0.55, screenUV.sub(0.5).length().mul(1.15));
-  return gcol.mul(mix(1.0, vig, 0.16));
-});
+// 治愈调色(暂时停用,排查串色 bug 后接回)
+// const grade = Fn(([c]) => {
+//   const lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+//   const shadowT = float(1.0).sub(smoothstep(0.0, 0.35, lum));
+//   let gcol = c.add(vec3(0.0, 0.30, 0.55).mul(shadowT.mul(0.10)));
+//   const lum2 = dot(gcol, vec3(0.2126, 0.7152, 0.0722));
+//   gcol = mix(vec3(lum2), gcol, 1.07);
+//   gcol = gcol.mul(mix(vec3(1.0), vec3(1.05, 1.0, 0.93), smoothstep(0.6, 1.6, lum2).mul(0.5)));
+//   const vig = smoothstep(1.35, 0.55, screenUV.sub(0.5).length().mul(1.15));
+//   return gcol.mul(mix(1.0, vig, 0.16));
+// });
 
 async function boot() {
   const app = document.getElementById('app');
@@ -109,12 +107,13 @@ async function boot() {
     booted = true;
   };
 
-  // 后处理:HDR -> Bloom -> 治愈调色
-  const postProcessing = new THREE.PostProcessing(renderer);
-  const scenePass = pass(scene, camera);
-  const sceneColor = scenePass.getTextureNode();
-  const bloomPass = bloom(sceneColor, 0.35, 0.3, 0.9);
-  postProcessing.outputNode = grade(sceneColor.add(bloomPass));
+  // 后处理:A/B 排查中 —— 暂用直渲(内置 ACES),定位灰天空/串色 bug 后再接回 Bloom+调色
+  // const postProcessing = new THREE.PostProcessing(renderer);
+  // const scenePass = pass(scene, camera);
+  // const sceneColor = scenePass.getTextureNode();
+  // const bloomPass = bloom(sceneColor, 0.35, 0.3, 0.9);
+  // postProcessing.outputNode = grade(sceneColor.add(bloomPass));
+  const postProcessingRender = () => renderer.render(scene, camera);
 
   await renderer.compileAsync(scene, camera);
   hud.ready();
@@ -131,7 +130,7 @@ async function boot() {
       input.interactEdge = false;
       hud.toast('这里以后能推门进去,下一版开放');
     }
-    postProcessing.render();
+    postProcessingRender();
     frames++; fpsT += dt;
     if (fpsT >= 0.5) {
       hud.setFps(Math.round(frames / fpsT), renderer.info.render.triangles);

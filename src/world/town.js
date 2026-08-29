@@ -76,12 +76,10 @@ function building(r, side, cx, cz, w, d, h, colliders, g) {
   }
 }
 
-function buildPalmGeometry() {
-  const parts = [];
+function buildPalmGeometries() {
   const trunk = new THREE.CylinderGeometry(0.14, 0.24, 5.6, 7);
   trunk.translate(0, 2.8, 0);
-  addColor(trunk, 0x7a5c42);
-  parts.push(trunk);
+  const leaves = [];
   for (let i = 0; i < 8; i++) {
     const leaf = new THREE.PlaneGeometry(0.6, 3.4, 1, 4);
     const pos = leaf.attributes.position;
@@ -96,10 +94,9 @@ function buildPalmGeometry() {
     leaf.rotateX(-Math.PI / 2 + 0.45);
     leaf.rotateY((i / 8) * Math.PI * 2 + 0.2);
     leaf.translate(0, 5.5, 0);
-    addColor(leaf, i % 2 ? 0x2f7a3c : 0x3f9248);
-    parts.push(leaf);
+    leaves.push(leaf);
   }
-  return mergeGeometries(parts);
+  return { trunk, leaves: mergeGeometries(leaves) };
 }
 
 export function createTown() {
@@ -110,7 +107,8 @@ export function createTown() {
   // ---- 地面分区 ----
   g.add(groundPlane(1000, 470, 0xe3dbc6, 50, -0.05, -170));           // 小镇基底(暖白)
   g.add(groundPlane(14, 270, 0x585b60, 0, 0.01, -90.5));               // 车行道
-  g.add(groundPlane(1.7, 266, 0x5f9e58, 0, 0.02, -91));                // 中央绿化岛
+  // 中央绿化岛(实体盒,排查平面+渐变串色)
+  g.add(box(1.7, 0.1, 266, 0x5f9e58, 0, 0.02, -91, { cast: false }));
   g.add(groundPlane(3, 268, 0xc9c2b3, -8.5, 0.02, -90));               // 左人行道
   g.add(groundPlane(3, 268, 0xc9c2b3, 8.5, 0.02, -90));                // 右人行道
   g.add(groundPlane(216, 8, 0xd9d2c0, 50, 0.015, 48));                 // 海滨步道
@@ -207,24 +205,28 @@ export function createTown() {
     g.add(box(0.12, 0.42, 0.5, 0x5c5148, bx + 0.75, 0.21, 46));
   }
 
-  // ---- 棕榈(实例化) ----
-  const palmGeo = buildPalmGeometry();
-  const palmMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide });
+  // ---- 棕榈(实例化:普通材质 + 顶点色路径排查) ----
+  const { trunk: palmTrunkGeo, leaves: palmLeafGeo } = buildPalmGeometries();
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x7a5c42, roughness: 0.95 });
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f9248, roughness: 0.9, side: THREE.DoubleSide });
   const palmPos = [];
   for (let z = -200; z <= 28; z += 18) palmPos.push([0, z]);
   for (let x = -48; x <= 150; x += 22) palmPos.push([x, 50.2]);
   palmPos.push([-14, 45], [14, 45]);
-  const palms = new THREE.InstancedMesh(palmGeo, palmMat, palmPos.length);
+  const palmsTrunk = new THREE.InstancedMesh(palmTrunkGeo, trunkMat, palmPos.length);
+  const palmsLeaves = new THREE.InstancedMesh(palmLeafGeo, leafMat, palmPos.length);
   palmPos.forEach(([x, z], i) => {
     dummy.position.set(x + (r() - 0.5) * 1.4, 0, z + (r() - 0.5) * 1.4);
     dummy.rotation.y = r() * Math.PI * 2;
     const s = 0.85 + r() * 0.5;
     dummy.scale.set(s, s * (0.9 + r() * 0.25), s);
     dummy.updateMatrix();
-    palms.setMatrixAt(i, dummy.matrix);
+    palmsTrunk.setMatrixAt(i, dummy.matrix);
+    palmsLeaves.setMatrixAt(i, dummy.matrix);
   });
-  palms.castShadow = true;
-  g.add(palms);
+  palmsTrunk.castShadow = true;
+  palmsLeaves.castShadow = true;
+  g.add(palmsTrunk); g.add(palmsLeaves);
 
   return {
     group: g,
