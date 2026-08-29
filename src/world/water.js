@@ -3,7 +3,7 @@
 import * as THREE from 'three/webgpu';
 import {
   Fn, vec2, vec3, float, mix, smoothstep, clamp,
-  sin, cos, pow, max, dot, normalize,
+  sin, cos, pow, max, dot, normalize, reflect,
   positionWorld, positionLocal, cameraPosition,
 } from 'three/tsl';
 import { skyColor, sunDirU, timeU, fbm } from './shared.js';
