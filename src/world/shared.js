@@ -83,7 +83,7 @@ export const skyColor = Fn(([dir]) => {
   col = mix(col, ccol, cmask);
 
   // 高层卷云(拉伸噪声薄丝)
-  const cir = fbm(persp.mul(vec2(2.2, 7.5)).add(vec2(3.3, 9.1)));
+  const cir = fbm(cp.mul(vec2(2.2, 7.5)).add(vec2(3.3, 9.1)));
   col = col.add(vec3(1.0).mul(smoothstep(0.62, 0.95, cir).mul(0.10).mul(smoothstep(0.2, 0.5, y))));
 
   return col;
