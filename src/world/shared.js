@@ -43,11 +43,11 @@ export const skyColor = Fn(([dir]) => {
   const y = d.y;
 
   // 基础大气渐变:地平线暖白 -> 中天青 -> 天顶湛蓝
-  const t = pow(clamp(y, 0.0, 1.0), 0.52);
-  const zen = vec3(0.16, 0.46, 0.86);
-  const mid = vec3(0.45, 0.72, 0.96);
-  const hor = vec3(0.90, 0.97, 1.02);
-  let col = mix(hor, mix(mid, zen, smoothstep(0.18, 0.85, t)), smoothstep(0.0, 0.22, t));
+  const t = pow(clamp(y, 0.0, 1.0), 0.60);
+  const zen = vec3(0.13, 0.42, 0.90);
+  const mid = vec3(0.34, 0.62, 0.97);
+  const hor = vec3(0.82, 0.94, 1.02);
+  let col = mix(hor, mix(mid, zen, smoothstep(0.14, 0.80, t)), smoothstep(0.0, 0.18, t));
   col = mix(col.mul(0.94), col, smoothstep(-0.08, 0.0, y));
 
   // 太阳:光晕先铺,日轮在云之前加入(云可遮挡日轮)
@@ -55,7 +55,7 @@ export const skyColor = Fn(([dir]) => {
   const warm = vec3(1.0, 0.86, 0.62);
   const glow = pow(sd, 420.0).mul(2.0).add(pow(sd, 32.0).mul(0.30));
   col = col.add(warm.mul(glow));
-  const haze = pow(sd, 3.0).mul(pow(clamp(1.0 - abs(y), 0.0, 1.0), 3.0)).mul(0.16);
+  const haze = pow(sd, 3.0).mul(pow(clamp(1.0 - abs(y), 0.0, 1.0), 3.0)).mul(0.08);
   col = col.add(warm.mul(haze));
   const disk = smoothstep(0.9993, 0.99985, sd).mul(26.0);
   col = col.add(vec3(1.0, 0.95, 0.85).mul(disk));

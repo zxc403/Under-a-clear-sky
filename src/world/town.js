@@ -80,7 +80,7 @@ function buildPalmGeometry() {
   const parts = [];
   const trunk = new THREE.CylinderGeometry(0.14, 0.24, 5.6, 7);
   trunk.translate(0, 2.8, 0);
-  addColor(trunk, 0x8a6b4f);
+  addColor(trunk, 0x7a5c42);
   parts.push(trunk);
   for (let i = 0; i < 8; i++) {
     const leaf = new THREE.PlaneGeometry(0.6, 3.4, 1, 4);
@@ -96,7 +96,7 @@ function buildPalmGeometry() {
     leaf.rotateX(-Math.PI / 2 + 0.45);
     leaf.rotateY((i / 8) * Math.PI * 2 + 0.2);
     leaf.translate(0, 5.5, 0);
-    addColor(leaf, i % 2 ? 0x4e8f4e : 0x6aa855);
+    addColor(leaf, i % 2 ? 0x2f7a3c : 0x3f9248);
     parts.push(leaf);
   }
   return mergeGeometries(parts);
@@ -109,10 +109,10 @@ export function createTown() {
 
   // ---- 地面分区 ----
   g.add(groundPlane(1000, 470, 0xe3dbc6, 50, -0.05, -170));           // 小镇基底(暖白)
-  g.add(groundPlane(14, 270, 0x6d6f73, 0, 0.01, -90.5));               // 车行道
-  g.add(groundPlane(1.7, 266, 0x7ca86c, 0, 0.02, -91));                // 中央绿化岛
-  g.add(groundPlane(3, 268, 0xd3cbbd, -8.5, 0.02, -90));               // 左人行道
-  g.add(groundPlane(3, 268, 0xd3cbbd, 8.5, 0.02, -90));                // 右人行道
+  g.add(groundPlane(14, 270, 0x585b60, 0, 0.01, -90.5));               // 车行道
+  g.add(groundPlane(1.7, 266, 0x5f9e58, 0, 0.02, -91));                // 中央绿化岛
+  g.add(groundPlane(3, 268, 0xc9c2b3, -8.5, 0.02, -90));               // 左人行道
+  g.add(groundPlane(3, 268, 0xc9c2b3, 8.5, 0.02, -90));                // 右人行道
   g.add(groundPlane(216, 8, 0xd9d2c0, 50, 0.015, 48));                 // 海滨步道
   const plaza = new THREE.Mesh(new THREE.CircleGeometry(16, 40), mat(0xe0d8c4, { rough: 0.95 }));
   plaza.rotation.x = -Math.PI / 2; plaza.position.set(0, 0.025, 48); plaza.receiveShadow = true;

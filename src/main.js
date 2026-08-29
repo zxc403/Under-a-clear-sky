@@ -67,13 +67,13 @@ async function boot() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.10;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   app.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xdfeef5, 140, 1300);
+  scene.fog = new THREE.Fog(0xd4ebf7, 140, 1300);
   const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 7000);
 
   // 14:28 午后阳光
