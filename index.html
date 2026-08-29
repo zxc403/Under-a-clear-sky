@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#7ec8f2" />
+<title>Under a Clear Sky · 晴空之下</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #87c5ea;
+    touch-action: none; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+  #fatal {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #7ec8f2, #eaf9fb);
+    color: #23425a; z-index: 99; padding: 28px; text-align: center;
+    font-size: 15px; line-height: 1.8; white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="fatal"></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
