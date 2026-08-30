@@ -59,16 +59,16 @@ function tryPointerLock(el) {
   }
 }
 
-// 治愈调色:阴影偏青 + 轻饱和 + 暖高光 + 轻暗角(全部用 TSL 节点算术,避免 JS 直减节点)
+// 治愈调色:阴影偏青 + 轻饱和 + 暖高光 + 轻暗角(全部显式 float/vec3,防类型错配)
 const grade = Fn(([c]) => {
   const lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  const shadowT = float(1.0).sub(smoothstep(0.0, 0.35, lum));
-  let gcol = c.add(vec3(0.0, 0.30, 0.55).mul(shadowT.mul(0.10)));
+  const shadowT = float(1.0).sub(smoothstep(float(0.0), float(0.35), lum));
+  let gcol = c.add(vec3(0.0, 0.30, 0.55).mul(shadowT.mul(float(0.10))));
   const lum2 = dot(gcol, vec3(0.2126, 0.7152, 0.0722));
-  gcol = mix(vec3(lum2), gcol, 1.07);
-  gcol = gcol.mul(mix(vec3(1.0), vec3(1.05, 1.0, 0.93), smoothstep(0.6, 1.6, lum2).mul(0.5)));
-  const vig = smoothstep(1.35, 0.55, screenUV.sub(0.5).length().mul(1.15));
-  return gcol.mul(mix(1.0, vig, 0.16));
+  gcol = mix(vec3(lum2), gcol, float(1.07));
+  gcol = gcol.mul(mix(vec3(1.0), vec3(1.05, 1.0, 0.93), smoothstep(float(0.6), float(1.6), lum2).mul(float(0.5))));
+  const vig = smoothstep(float(1.35), float(0.55), screenUV.sub(0.5).length().mul(float(1.15)));
+  return gcol.mul(mix(vec3(1.0), vec3(vig), float(0.16)));
 });
 
 async function boot() {
@@ -132,8 +132,8 @@ async function boot() {
     booted = true;
   };
 
-  // 后处理:HDR -> Bloom -> 治愈调色(NaN 已修,管线安全接回)
-  const postProcessing = new THREE.PostProcessing(renderer);
+  // 后处理:HDR -> Bloom -> 治愈调色(r183+ 更名 RenderPipeline)
+  const postProcessing = new THREE.RenderPipeline(renderer);
   const scenePass = pass(scene, camera);
   const sceneColor = scenePass.getTextureNode();
   const bloomPass = bloom(sceneColor, 0.30, 0.35, 0.85);
