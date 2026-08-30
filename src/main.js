@@ -157,6 +157,13 @@ async function boot() {
     // 位置修正:±16 横向偏角 58° 超出 62° 视野 → 收窄到 ±9,44(广场入口内侧,出生点正前方可视范围)
     placeGLB('models/fishshop_02.glb', -9, 44, Math.PI / 2, 'fishshop_02');
     placeGLB('models/cafe_03.glb', 9, 44, -Math.PI / 2, 'cafe_03');
+    // 调试:?debug=1 放红色占位方块于同坐标,区分"坐标不可见"vs"模型问题"
+    if (new URLSearchParams(location.search).get('debug') === '1') {
+      const dbg = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 4), new THREE.MeshBasicMaterial({ color: 0xff2020 }));
+      dbg.position.set(-9, 5, 44); scene.add(dbg);
+      const dbg2 = dbg.clone(); dbg2.position.set(9, 5, 44); scene.add(dbg2);
+      console.log('[debug] placeholder boxes at ±9,44');
+    }
   }
 
   const hud = new HUD();
