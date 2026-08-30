@@ -139,7 +139,7 @@ async function boot() {
             // 统一替换为节点材质并保留顶点色,与场景其他对象同路径编译
             const src = o.material;
             const nm = new THREE.MeshStandardNodeMaterial({
-              vertexColors: false, // 顶点色(COLOR_0)与节点管线冲突=串色根源,禁用
+              vertexColors: true, // GLB 依赖 COLOR_0 顶点着色(串色根因是 grade 节点,已摘除,可安全启用)
               roughness: 0.92,
               metalness: 0.0,
             });
