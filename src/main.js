@@ -124,7 +124,22 @@ async function boot() {
         const m = gltf.scene;
         m.position.set(x, 0, z);
         m.rotation.y = rotY;
-        m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        m.traverse((o) => {
+          if (o.isMesh) {
+            // 关键修复:GLTF 默认材质(legacy)混入 TSL 节点管线会触发通道串色,
+            // 统一替换为节点材质并保留顶点色,与场景其他对象同路径编译
+            const src = o.material;
+            const nm = new THREE.MeshStandardNodeMaterial({
+              vertexColors: !!src.vertexColors,
+              roughness: 0.92,
+              metalness: 0.0,
+            });
+            if (!src.vertexColors && src.color) nm.color = src.color.clone();
+            o.material = nm;
+            o.castShadow = true;
+            o.receiveShadow = true;
+          }
+        });
         scene.add(m);
         placed.push(name);
         console.log('[building] placed:', name);
