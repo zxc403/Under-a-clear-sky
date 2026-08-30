@@ -159,9 +159,9 @@ async function boot() {
     // 用户数据化调整:放大 30%(0.55×1.3=0.715),间距收近一丢丢(±16→±12)
     // 主街替换布局(一期计划回归):GLB 嵌入主街两侧,替换对应灰盒(town.js 已设保留区跳过原灰盒)
     // 楼体正面朝街心;02 水产店西 z=6 / 03 咖啡馆东 z=6 / 04 杂货铺西 z=-10
-    placeGLB('models/fishshop_02.glb', -15, 6, Math.PI / 2, 'fishshop_02', 0.715);
-    placeGLB('models/cafe_03.glb', 15, 6, -Math.PI / 2, 'cafe_03', 0.715);
-    placeGLB('models/store_04.glb', -15, -10, Math.PI / 2, 'store_04', 0.715);
+    placeGLB('models/fishshop_02.glb', -15, 6, Math.PI / 2, 'fishshop_02', 0.86);
+    placeGLB('models/cafe_03.glb', 15, 6, -Math.PI / 2, 'cafe_03', 0.86);
+    placeGLB('models/store_04.glb', -15, -10, Math.PI / 2, 'store_04', 0.86);
     // 调试:?debug=1 放红色占位方块于同坐标,区分"坐标不可见"vs"模型问题"
     if (new URLSearchParams(location.search).get('debug') === '1') {
       const dbg = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 4), new THREE.MeshBasicMaterial({ color: 0xff2020 }));
