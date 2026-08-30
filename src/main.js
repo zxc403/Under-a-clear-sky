@@ -154,9 +154,9 @@ async function boot() {
         console.log('[building] placed:', name);
       }, undefined, (err) => console.warn('[building] load fail:', url, err));
     }
-    // 位置修正:广场开阔区、出生点(0,56)正前方两侧,面向街心
-    placeGLB('models/fishshop_02.glb', -16, 46, Math.PI / 2, 'fishshop_02');
-    placeGLB('models/cafe_03.glb', 16, 46, -Math.PI / 2, 'cafe_03');
+    // 位置修正:±16 横向偏角 58° 超出 62° 视野 → 收窄到 ±9,44(广场入口内侧,出生点正前方可视范围)
+    placeGLB('models/fishshop_02.glb', -9, 44, Math.PI / 2, 'fishshop_02');
+    placeGLB('models/cafe_03.glb', 9, 44, -Math.PI / 2, 'cafe_03');
   }
 
   const hud = new HUD();
