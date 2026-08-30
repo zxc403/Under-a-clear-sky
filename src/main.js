@@ -154,8 +154,9 @@ async function boot() {
         console.log('[building] placed:', name);
       }, undefined, (err) => console.warn('[building] load fail:', url, err));
     }
-    placeGLB('models/fishshop_02.glb', -22, -14, Math.PI, 'fishshop_02');
-    placeGLB('models/cafe_03.glb', 20, -46, 0, 'cafe_03');
+    // 位置修正:原坐标与灰盒楼排(x=±10~±20)穿模被遮挡,移到主街南段广场旁空地
+    placeGLB('models/fishshop_02.glb', -15, 34, Math.PI / 2, 'fishshop_02');
+    placeGLB('models/cafe_03.glb', 15, 34, -Math.PI / 2, 'cafe_03');
   }
 
   const hud = new HUD();
