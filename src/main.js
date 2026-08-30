@@ -180,15 +180,16 @@ async function boot() {
     booted = true;
   };
 
-  // 后处理:Bloom(高阈值 0.88 / 小半径 0.30 / 适中强度 0.32,防糊)+ 治愈调色(显式类型,修复串色后接回)
+  // 后处理:Bloom(高阈值 0.88 / 小半径 0.30 / 适中强度 0.32,防糊)
+  // TSL grade 节点在 WebGPU 编译路径下引发通道串色,已从输出链摘除;?grade=1 可调试性恢复
   const postProcessing = new THREE.RenderPipeline(renderer);
   const scenePass = pass(scene, camera);
   const sceneColor = scenePass.getTextureNode();
-  // A/B 排查:?nograde=1 跳过调色(定位串色根因);默认调色+Bloom 全开
-  if (new URLSearchParams(location.search).get('nograde') === '1') {
-    postProcessing.outputNode = sceneColor.add(bloom(sceneColor, 0.32, 0.30, 0.88));
+  const bloomPass = bloom(sceneColor, 0.32, 0.30, 0.88);
+  if (new URLSearchParams(location.search).get('grade') === '1') {
+    postProcessing.outputNode = grade(sceneColor.add(bloomPass)); // 仅调试用
   } else {
-    postProcessing.outputNode = grade(sceneColor.add(bloom(sceneColor, 0.32, 0.30, 0.88)));
+    postProcessing.outputNode = sceneColor.add(bloomPass);
   }
 
   await renderer.compileAsync(scene, camera);
