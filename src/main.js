@@ -124,9 +124,8 @@ async function boot() {
   // 丁达尔光束(?rays=0 关闭)
   if (new URLSearchParams(location.search).get('rays') !== '0') scene.add(createGodRays());
 
-  // 验货建筑 02/03: 默认关闭——GLB 标准材质与 TSL 管线存在通道串色冲突(排查中),
-  // 加 ?glb=1 可开启预览; 定位修复后再改回默认开启
-  if (new URLSearchParams(location.search).get('glb') === '1') {
+  // 验货建筑 02/03: 串色根因已确认在 grade() 调色节点(已摘除),与 GLB 无关 → 默认开启
+  if (new URLSearchParams(location.search).get('glb') !== '0') {
     const loader = new GLTFLoader();
     const placed = [];
     function placeGLB(url, x, z, rotY, name) {
