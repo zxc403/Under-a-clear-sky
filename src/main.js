@@ -61,16 +61,25 @@ function tryPointerLock(el) {
   }
 }
 
-// 治愈调色:阴影偏青 + 轻饱和 + 暖高光 + 轻暗角(全部显式 float/vec3,防类型错配)
+// 治愈调色 V3:彻底避免"标量→vec3"隐式构造与 mix 过饱和系数,全部逐分量显式运算(修复通道串色)
 const grade = Fn(([c]) => {
   const lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
   const shadowT = float(1.0).sub(smoothstep(float(0.0), float(0.38), lum));
-  let gcol = c.add(vec3(0.0, 0.30, 0.55).mul(shadowT.mul(float(0.14))));
+  const tint = vec3(0.0, 0.30, 0.55).mul(shadowT.mul(float(0.14)));
+  const gcol = c.add(tint);
   const lum2 = dot(gcol, vec3(0.2126, 0.7152, 0.0722));
-  gcol = mix(vec3(lum2), gcol, float(1.10));
-  gcol = gcol.mul(mix(vec3(1.0), vec3(1.05, 1.0, 0.93), smoothstep(float(0.6), float(1.6), lum2).mul(float(0.5))));
+  // 轻饱和:不 mix,直接朝灰度方向收 8%(安全、无通道错位风险)
+  const sat = float(0.92);
+  const graded = lum2.mul(float(0.08)).add(gcol.mul(sat));
+  // 暖高光:逐通道乘系数
+  const warm = smoothstep(float(0.6), float(1.6), lum2).mul(float(0.5));
+  const r = graded.r.mul(float(1.0).add(float(0.05).mul(warm)));
+  const gg = graded.g;
+  const b = graded.b.mul(float(1.0).sub(float(0.07).mul(warm)));
+  // 暗角:逐通道乘同一系数
   const vig = smoothstep(float(1.35), float(0.55), screenUV.sub(0.5).length().mul(float(1.15)));
-  return gcol.mul(mix(vec3(1.0), vec3(vig), float(0.16)));
+  const vmul = float(1.0).sub(float(0.16).sub(vig.mul(float(0.16))));
+  return vec3(r.mul(vmul), gg.mul(vmul), b.mul(vmul));
 });
 
 async function boot() {
