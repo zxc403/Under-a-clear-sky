@@ -175,7 +175,12 @@ async function boot() {
   const postProcessing = new THREE.RenderPipeline(renderer);
   const scenePass = pass(scene, camera);
   const sceneColor = scenePass.getTextureNode();
-  postProcessing.outputNode = grade(sceneColor.add(bloom(sceneColor, 0.32, 0.30, 0.88)));
+  // A/B 排查:?nograde=1 跳过调色(定位串色根因);默认调色+Bloom 全开
+  if (new URLSearchParams(location.search).get('nograde') === '1') {
+    postProcessing.outputNode = sceneColor.add(bloom(sceneColor, 0.32, 0.30, 0.88));
+  } else {
+    postProcessing.outputNode = grade(sceneColor.add(bloom(sceneColor, 0.32, 0.30, 0.88)));
+  }
 
   await renderer.compileAsync(scene, camera);
   hud.ready();
