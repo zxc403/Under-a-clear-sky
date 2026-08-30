@@ -132,12 +132,11 @@ async function boot() {
     booted = true;
   };
 
-  // 后处理:HDR -> Bloom -> 治愈调色(r183+ 更名 RenderPipeline)
+  // 后处理:只用社区标准 bloom(自定义 grade 两次尝试均致串色,放弃)
   const postProcessing = new THREE.RenderPipeline(renderer);
   const scenePass = pass(scene, camera);
   const sceneColor = scenePass.getTextureNode();
-  const bloomPass = bloom(sceneColor, 0.30, 0.35, 0.85);
-  postProcessing.outputNode = grade(sceneColor.add(bloomPass));
+  postProcessing.outputNode = sceneColor.add(bloom(sceneColor, 0.30, 0.35, 0.85));
 
   await renderer.compileAsync(scene, camera);
   hud.ready();
