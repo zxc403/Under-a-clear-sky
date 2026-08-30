@@ -50,9 +50,9 @@ const waterColor = Fn(() => {
   // 深度渐变(由离岸距离伪造浅滩)
   const dist = pw.z.sub(WATER_EDGE_Z);
   const shallow = float(1.0).sub(smoothstep(0.0, 26.0, dist));
-  const deep = vec3(0.03, 0.32, 0.55);
-  const midc = vec3(0.06, 0.55, 0.72);
-  const shal = vec3(0.20, 0.85, 0.78);
+  const deep = vec3(0.02, 0.30, 0.54);
+  const midc = vec3(0.04, 0.52, 0.70);
+  const shal = vec3(0.14, 0.82, 0.76);
   let wcol = mix(deep, midc, smoothstep(0.0, 0.6, shallow));
   wcol = mix(wcol, shal, smoothstep(0.55, 1.0, shallow));
   const sand = vec3(0.76, 0.72, 0.55);
