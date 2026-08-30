@@ -115,22 +115,24 @@ async function boot() {
   // 丁达尔光束(?rays=0 关闭)
   if (new URLSearchParams(location.search).get('rays') !== '0') scene.add(createGodRays());
 
-  // 验货建筑 02/03: 鱼八水产 + 岬咖啡 (GLB, 1unit=1m, 原点底面中心)
-  const loader = new GLTFLoader();
-  const placed = [];
-  function placeGLB(url, x, z, rotY, name) {
-    loader.load(url, (gltf) => {
-      const m = gltf.scene;
-      m.position.set(x, 0, z);
-      m.rotation.y = rotY;
-      m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-      scene.add(m);
-      placed.push(name);
-      console.log('[building] placed:', name);
-    }, undefined, (err) => console.warn('[building] load fail:', url, err));
+  // 验货建筑 02/03: 鱼八水产 + 岬咖啡 (GLB, 1unit=1m, 原点底面中心); ?noglb=1 用于 A/B 排查
+  if (new URLSearchParams(location.search).get('noglb') !== '1') {
+    const loader = new GLTFLoader();
+    const placed = [];
+    function placeGLB(url, x, z, rotY, name) {
+      loader.load(url, (gltf) => {
+        const m = gltf.scene;
+        m.position.set(x, 0, z);
+        m.rotation.y = rotY;
+        m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        scene.add(m);
+        placed.push(name);
+        console.log('[building] placed:', name);
+      }, undefined, (err) => console.warn('[building] load fail:', url, err));
+    }
+    placeGLB('models/fishshop_02.glb', -22, -14, Math.PI, 'fishshop_02');
+    placeGLB('models/cafe_03.glb', 20, -46, 0, 'cafe_03');
   }
-  placeGLB('models/fishshop_02.glb', -22, -14, Math.PI, 'fishshop_02');
-  placeGLB('models/cafe_03.glb', 20, -46, 0, 'cafe_03');
 
   const hud = new HUD();
   hud.setBackend(backend);
