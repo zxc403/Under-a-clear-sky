@@ -130,11 +130,11 @@ async function boot() {
             // 统一替换为节点材质并保留顶点色,与场景其他对象同路径编译
             const src = o.material;
             const nm = new THREE.MeshStandardNodeMaterial({
-              vertexColors: !!src.vertexColors,
+              vertexColors: false, // 顶点色(COLOR_0)与节点管线冲突=串色根源,禁用
               roughness: 0.92,
               metalness: 0.0,
             });
-            if (!src.vertexColors && src.color) nm.color = src.color.clone();
+            if (src && src.color) nm.color = src.color.clone(); // 分色多网格:每网格自带底色
             o.material = nm;
             o.castShadow = true;
             o.receiveShadow = true;
