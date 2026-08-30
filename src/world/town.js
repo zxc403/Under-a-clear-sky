@@ -96,7 +96,22 @@ function buildPalmGeometries() {
     leaf.translate(0, 5.5, 0);
     leaves.push(leaf);
   }
-  return { trunk, leaves: mergeGeometries(leaves) };
+  const merged = mergeGeometries(leaves);
+  // 球形法线(原神式树冠):法线向冠心球面方向混合 70%,弱化叶间明暗反差,树冠整体更"团"
+  {
+    const pos = merged.attributes.position, nor = merged.attributes.normal;
+    const c = new THREE.Vector3(0, 5.6, 0);
+    const p = new THREE.Vector3(), n = new THREE.Vector3(), s = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      p.fromBufferAttribute(pos, i);
+      n.fromBufferAttribute(nor, i);
+      s.copy(p).sub(c).normalize();
+      n.lerp(s, 0.7).normalize();
+      nor.setXYZ(i, n.x, n.y, n.z);
+    }
+    nor.needsUpdate = true;
+  }
+  return { trunk, leaves: merged };
 }
 
 export function createTown() {
@@ -108,7 +123,7 @@ export function createTown() {
   g.add(groundPlane(1000, 470, 0xe3dbc6, 50, -0.05, -170));           // 小镇基底(暖白)
   g.add(groundPlane(14, 270, 0x585b60, 0, 0.01, -90.5));               // 车行道
   // 中央绿化岛(实体盒,排查平面+渐变串色)
-  g.add(box(1.7, 0.1, 266, 0x5f9e58, 0, 0.02, -91, { cast: false }));
+  g.add(box(1.7, 0.1, 266, 0x7ea05c, 0, 0.02, -91, { cast: false })); // 绿化岛压饱和:荧光绿→暖橄榄绿
   g.add(groundPlane(3, 268, 0xc9c2b3, -8.5, 0.02, -90));               // 左人行道
   g.add(groundPlane(3, 268, 0xc9c2b3, 8.5, 0.02, -90));                // 右人行道
   g.add(groundPlane(216, 8, 0xd9d2c0, 50, 0.015, 48));                 // 海滨步道
@@ -208,7 +223,11 @@ export function createTown() {
   // ---- 棕榈(实例化:普通材质 + 顶点色路径排查) ----
   const { trunk: palmTrunkGeo, leaves: palmLeafGeo } = buildPalmGeometries();
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x7a5c42, roughness: 0.95 });
-  const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f9248, roughness: 0.9, side: THREE.DoubleSide });
+  // 叶片:压饱和偏暖绿 + 暗部发光地板(原神"最低光强"思路,防背光面死黑)
+  const leafMat = new THREE.MeshStandardMaterial({
+    color: 0x6f9a4e, roughness: 0.9, side: THREE.DoubleSide,
+    emissive: 0x1c331a, emissiveIntensity: 0.55,
+  });
   const palmPos = [];
   for (let z = -200; z <= 28; z += 18) palmPos.push([0, z]);
   for (let x = -48; x <= 150; x += 22) palmPos.push([x, 50.2]);

@@ -7,6 +7,8 @@ import { SUN_DIR, timeU } from './world/shared.js';
 import { createSky } from './world/sky.js';
 import { createWater } from './world/water.js';
 import { createTown } from './world/town.js';
+import { createGodRays } from './world/rays.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Input } from './controls/input.js';
 import { Player } from './controls/player.js';
 import { HUD } from './ui/hud.js';
@@ -62,10 +64,10 @@ function tryPointerLock(el) {
 // 治愈调色:阴影偏青 + 轻饱和 + 暖高光 + 轻暗角(全部显式 float/vec3,防类型错配)
 const grade = Fn(([c]) => {
   const lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  const shadowT = float(1.0).sub(smoothstep(float(0.0), float(0.35), lum));
-  let gcol = c.add(vec3(0.0, 0.30, 0.55).mul(shadowT.mul(float(0.10))));
+  const shadowT = float(1.0).sub(smoothstep(float(0.0), float(0.38), lum));
+  let gcol = c.add(vec3(0.0, 0.30, 0.55).mul(shadowT.mul(float(0.14))));
   const lum2 = dot(gcol, vec3(0.2126, 0.7152, 0.0722));
-  gcol = mix(vec3(lum2), gcol, float(1.07));
+  gcol = mix(vec3(lum2), gcol, float(1.10));
   gcol = gcol.mul(mix(vec3(1.0), vec3(1.05, 1.0, 0.93), smoothstep(float(0.6), float(1.6), lum2).mul(float(0.5))));
   const vig = smoothstep(float(1.35), float(0.55), screenUV.sub(0.5).length().mul(float(1.15)));
   return gcol.mul(mix(vec3(1.0), vec3(vig), float(0.16)));
@@ -86,13 +88,13 @@ async function boot() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.10;
+  renderer.toneMappingExposure = 1.045; // V2.1:整体曝光减弱约 5%(用户反馈天空略亮)
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   app.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xd4ebf7, 140, 1300);
+  scene.fog = new THREE.Fog(0xdceffa, 100, 720); // 距离雾收紧:远景 CBD/天际线获得空气透视
   const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 7000);
 
   // 14:28 午后阳光
@@ -110,6 +112,25 @@ async function boot() {
   scene.add(createWater());
   const town = createTown();
   scene.add(town.group);
+  // 丁达尔光束(?rays=0 关闭)
+  if (new URLSearchParams(location.search).get('rays') !== '0') scene.add(createGodRays());
+
+  // 验货建筑 02/03: 鱼八水产 + 岬咖啡 (GLB, 1unit=1m, 原点底面中心)
+  const loader = new GLTFLoader();
+  const placed = [];
+  function placeGLB(url, x, z, rotY, name) {
+    loader.load(url, (gltf) => {
+      const m = gltf.scene;
+      m.position.set(x, 0, z);
+      m.rotation.y = rotY;
+      m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      scene.add(m);
+      placed.push(name);
+      console.log('[building] placed:', name);
+    }, undefined, (err) => console.warn('[building] load fail:', url, err));
+  }
+  placeGLB('models/fishshop_02.glb', -22, -14, Math.PI, 'fishshop_02');
+  placeGLB('models/cafe_03.glb', 20, -46, 0, 'cafe_03');
 
   const hud = new HUD();
   hud.setBackend(backend);
@@ -132,11 +153,11 @@ async function boot() {
     booted = true;
   };
 
-  // 后处理:只用社区标准 bloom(自定义 grade 两次尝试均致串色,放弃)
+  // 后处理:Bloom(高阈值 0.88 / 小半径 0.30 / 适中强度 0.32,防糊)+ 治愈调色(显式类型,修复串色后接回)
   const postProcessing = new THREE.RenderPipeline(renderer);
   const scenePass = pass(scene, camera);
   const sceneColor = scenePass.getTextureNode();
-  postProcessing.outputNode = sceneColor.add(bloom(sceneColor, 0.30, 0.35, 0.85));
+  postProcessing.outputNode = grade(sceneColor.add(bloom(sceneColor, 0.32, 0.30, 0.88)));
 
   await renderer.compileAsync(scene, camera);
   hud.ready();
