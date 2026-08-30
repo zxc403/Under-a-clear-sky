@@ -154,9 +154,9 @@ async function boot() {
         console.log('[building] placed:', name);
       }, undefined, (err) => console.warn('[building] load fail:', url, err));
     }
-    // 位置修正:原坐标与灰盒楼排(x=±10~±20)穿模被遮挡,移到主街南段广场旁空地
-    placeGLB('models/fishshop_02.glb', -15, 34, Math.PI / 2, 'fishshop_02');
-    placeGLB('models/cafe_03.glb', 15, 34, -Math.PI / 2, 'cafe_03');
+    // 位置修正:主街尽头/广场入口两侧,面向街心(灰盒楼排最远可延伸到 z≈38,z=41 处无穿模)
+    placeGLB('models/fishshop_02.glb', -13, 41, Math.PI / 2, 'fishshop_02');
+    placeGLB('models/cafe_03.glb', 13, 41, -Math.PI / 2, 'cafe_03');
   }
 
   const hud = new HUD();
@@ -168,6 +168,9 @@ async function boot() {
   const sp = new URLSearchParams(location.search).get('spawn');
   if (sp === 'beach') player.pos.set(0, 0, 30);
   else if (sp === 'plaza') player.pos.set(0, 0, 44);
+  // 调试出生朝向:?yaw=度数(0=北/主街方向,180=南/大海方向)
+  const yd = parseFloat(new URLSearchParams(location.search).get('yaw'));
+  if (!Number.isNaN(yd)) player.yaw = (yd * Math.PI) / 180;
 
   hud.onEnter = () => {
     if (input.isTouch) {
