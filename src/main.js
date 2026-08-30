@@ -154,9 +154,9 @@ async function boot() {
         console.log('[building] placed:', name);
       }, undefined, (err) => console.warn('[building] load fail:', url, err));
     }
-    // 位置修正:主街尽头/广场入口两侧,面向街心(灰盒楼排最远可延伸到 z≈38,z=41 处无穿模)
-    placeGLB('models/fishshop_02.glb', -13, 41, Math.PI / 2, 'fishshop_02');
-    placeGLB('models/cafe_03.glb', 13, 41, -Math.PI / 2, 'cafe_03');
+    // 位置修正:灰盒楼排实际边缘可达 z≈39,z=41 仍被遮挡 → 挪到圆形广场开阔区(半径16,中心z=48),无遮挡
+    placeGLB('models/fishshop_02.glb', -14, 50, Math.PI / 2, 'fishshop_02');
+    placeGLB('models/cafe_03.glb', 14, 50, -Math.PI / 2, 'cafe_03');
   }
 
   const hud = new HUD();
