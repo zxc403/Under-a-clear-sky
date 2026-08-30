@@ -136,11 +136,19 @@ export function createTown() {
   for (let i = 0; i < 6; i++) g.add(box(0.9, 0.02, 2.4, 0xe8e8e4, -5 + i * 2, 0.03, 38, { cast: false }));
 
   // ---- 主街两侧建筑(灰盒体量) ----
+  // 精装保留区:这些 z 区间的灰盒跳过,由 main.js 的 GLB 精装建筑替换(02/03/04)
+  const reserved = [
+    { side: -1, z0: -16, z1: 12 },  // 西侧: 04 杂货铺(z≈-10) + 02 水产店(z≈6)
+    { side: 1, z0: 0, z1: 12 },     // 东侧: 03 咖啡馆(z≈6)
+  ];
   for (const side of [-1, 1]) {
     let z = -206;
     while (z < 24) {
       const w = 11 + r() * 4, d = 10 + r() * 5, h = 7 + r() * 9;
-      building(r, side, side * (10 + w / 2), z + d / 2, w, d, h, colliders, g);
+      const hitReserved = reserved.some(rv => rv.side === side && z < rv.z1 && z + d > rv.z0);
+      if (!hitReserved) {
+        building(r, side, side * (10 + w / 2), z + d / 2, w, d, h, colliders, g);
+      }
       z += d + 2 + r() * 4;
     }
   }
