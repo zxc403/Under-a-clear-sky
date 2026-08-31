@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>晴空之下 · 主街实机预览</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:"PingFang SC","Microsoft YaHei",sans-serif; overflow:hidden; background:#dfe9f2; }
+  .hud { position:fixed; top:16px; left:16px; background:rgba(255,255,255,.88); color:#2c3a45;
+         border-radius:12px; padding:12px 18px; z-index:10; font-size:13px; line-height:1.7; }
+  .hud h1 { font-size:16px; margin-bottom:4px; }
+  .bar { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); display:flex; gap:10px; z-index:10; }
+  .bar button { background:rgba(30,38,48,.88); border:1px solid rgba(255,255,255,.14); color:#e8ecf1;
+                padding:9px 16px; border-radius:10px; font-size:13px; cursor:pointer; }
+  .bar button.on { background:#3d8f6f; border-color:#3d8f6f; }
+  #load { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+          background:#dfe9f2; z-index:20; font-size:15px; color:#2c3a45; }
+  #load.done { display:none; }
+  #pbar { width:220px; height:6px; background:#c5d2dd; border-radius:3px; margin-top:10px; }
+  #pfill { height:100%; width:0%; background:#3d8f6f; border-radius:3px; transition:width .2s; }
+</style>
+<script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://unpkg.com/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+<div class="hud"><h1>晴空之下 · 主街实机预览</h1>
+<p>12 栋建筑 · 18.9 万面 · 拖拽旋转 / 滚轮缩放</p></div>
+<div class="bar">
+  <button id="bView" class="on">🌇 街道视角</button>
+  <button id="bTop">🚁 鸟瞰</button>
+  <button id="bSun" class="on">☀️ 白天</button>
+  <button id="bDusk">🌆 黄昏</button>
+</div>
+<div id="load"><div style="text-align:center">主街加载中…<div id="pbar"><div id="pfill"></div></div></div></div>
+<script>
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0xdfe9f2);
+scene.fog = new THREE.Fog(0xdfe9f2, 90, 260);
+var camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 500);
+camera.position.set(0, 8, 26);
+var renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.getElementById('app') || document.body.appendChild(renderer.domElement);
+var controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2, 0); controls.maxPolarAngle = Math.PI/2.05; controls.update();
+var sun = new THREE.DirectionalLight(0xfff2dd, 2.2); sun.position.set(40, 60, 30);
+sun.castShadow = true; sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-40; sun.shadow.camera.right=40; sun.shadow.camera.top=40; sun.shadow.camera.bottom=-40;
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xbfd8ee, 0x9a9484, 0.9));
+var ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 300),
+  new THREE.MeshStandardMaterial({ color:0xb0b6ba, roughness:1 }));
+ground.rotation.x = -Math.PI/2; ground.position.y = -0.05; ground.receiveShadow = true;
+scene.add(ground);
+// 进度条
+new THREE.GLTFLoader().load('models/mainstreet.glb', function(g){
+  g.scene.traverse(function(o){ if (o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  scene.add(g.scene);
+  document.getElementById('load').classList.add('done');
+}, function(x){ if (x.total) document.getElementById('pfill').style.width = Math.round(x.loaded/x.total*100)+'%'; },
+function(e){ document.getElementById('load').innerHTML = '<span style="color:#c0392b">模型加载失败: '+e+'</span>'; });
+var bV=document.getElementById('bView'), bT=document.getElementById('bTop');
+var bS=document.getElementById('bSun'), bD=document.getElementById('bDusk');
+function setCam(p,t){ camera.position.set.apply(camera.position,p); controls.target.set.apply(controls.target,t); controls.update(); }
+bV.onclick=function(){ setCam([0,8,26],[0,2,0]); bV.classList.add('on'); bT.classList.remove('on'); };
+bT.onclick=function(){ setCam([0,90,2],[0,0,0]); bT.classList.add('on'); bV.classList.remove('on'); };
+bS.onclick=function(){ sun.color.set(0xfff2dd); sun.intensity=2.2; sun.position.set(40,60,30);
+  scene.background.set(0xdfe9f2); scene.fog.color.set(0xdfe9f2); bS.classList.add('on'); bD.classList.remove('on'); };
+bD.onclick=function(){ sun.color.set(0xffb27a); sun.intensity=1.4; sun.position.set(-50,25,10);
+  scene.background.set(0xe8b58a); scene.fog.color.set(0xe8b58a); bD.classList.add('on'); bS.classList.remove('on'); };
+addEventListener('resize', function(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+(function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+</script>
+</body>
+</html>
