@@ -5010,7 +5010,7 @@
   </div>
 </div>
 <script>
-// GLB base64 数据块读取（容错解码：剔除一切非 b64 字符，纯 JS 位运算，不依赖 atob）
+// GLB base64 容错解码器（纯 JS 位运算，不依赖 atob）
 function glbBuf(id) {
   var s = String(window[id]).replace(/[^A-Za-z0-9+\/=]/g, '');
   var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -5025,17 +5025,34 @@ function glbBuf(id) {
   for (var k = 0; k < n; k++) u8[k] = bin.charCodeAt(k) & 0xFF;
   return u8.buffer;
 }
+
 function loadGlb(id, cb) {
+  var loadEl = document.getElementById('load');
   try {
-    if (!window.THREE) { document.getElementById('load').innerHTML = '<span id="err">THREE 未加载</span>'; return; }
-    if (!THREE.GLTFLoader) { document.getElementById('load').innerHTML = '<span id="err">GLTFLoader 未加载 (three=' + (THREE.REVISION||'?') + ')</span>'; return; }
-    if (!window[id]) { document.getElementById('load').innerHTML = '<span id="err">数据块缺失: ' + id + '</span>'; return; }
+    if (!window.THREE) { loadEl.innerHTML = '<span id="err">❌ THREE 未加载</span>'; return; }
+    var threeVer = THREE.REVISION || '?';
+    if (!THREE.GLTFLoader) { loadEl.innerHTML = '<span id="err">❌ GLTFLoader 缺失 (three r' + threeVer + ')</span>'; return; }
+    if (!window[id]) { loadEl.innerHTML = '<span id="err">❌ 数据块缺失：' + id + '</span>'; return; }
+    var buf = glbBuf(id);
+    console.log('[loadGlb]', id, 'bytes=', buf.byteLength);
+    // 在加载层显示诊断信息（不阻断加载）
+    if (loadEl && !loadEl.getAttribute('data-probed')) {
+      loadEl.setAttribute('data-probed', '1');
+      loadEl.innerHTML = '<div style="font-size:13px;line-height:1.8;text-align:left;">' +
+        '✅ THREE r' + threeVer + ' | ✅ GLTFLoader | 📦 ' + id + ' = ' + buf.byteLength + ' bytes' +
+        '<br/>正在解析模型…</div>';
+    }
     var loader = new THREE.GLTFLoader();
-    loader.parse(glbBuf(id), '', function(g){ cb(g); }, function(e){
-      document.getElementById('load').innerHTML = '<span id="err">模型解析失败: ' + e + '</span>';
+    loader.parse(buf, '', function(g){ 
+      console.log('[loadGlb OK]', id, g);
+      cb(g); 
+    }, function(e){
+      console.error('[loadGlb ERR]', id, e);
+      loadEl.innerHTML = '<span id="err">❌ 模型解析失败：<br/>' + String(e) + '</span>';
     });
   } catch (err) {
-    document.getElementById('load').innerHTML = '<span id="err">加载异常: ' + err.message + '</span>';
+    console.error('[loadGlb EXC]', err);
+    document.getElementById('load').innerHTML = '<span id="err">❌ 加载异常：' + err.message + '</span>';
   }
 }
 </script>
@@ -5061,7 +5078,7 @@ renderer.toneMapping = THREE.NoToneMapping;
 document.getElementById('app').appendChild(renderer.domElement);
 
 // ---------- 第一人称控制：点击锁定 + WASD + Shift + 鼠标视角 ----------
-var cam = { yaw: Math.PI, pitch: -0.05, pos: new THREE.Vector3(0, 1.65, 12) };
+var cam = { yaw: 0, pitch: -0.05, pos: new THREE.Vector3(0, 1.65, 12) };
 var keys = {};
 var locked = false;
 var overlay = document.getElementById('lockOverlay');
@@ -5133,7 +5150,13 @@ scene.add(ground);
 
 // ---------- 加载模型 ----------
 var loadedN = 0;
-function markLoaded(){ loadedN++; if (loadedN === 2) document.getElementById('load').classList.add('done'); }
+function markLoaded(){
+  loadedN++;
+  if (loadedN === 2){
+    document.getElementById('load').classList.add('done');
+    setTimeout(function(){ document.getElementById('lockOverlay').style.display = 'none'; }, 2500);
+  }
+}
 loadGlb('glbCafe', function(g){
   g.scene.traverse(function(o){
     if (o.isMesh){ o.castShadow = o.receiveShadow = true; }
