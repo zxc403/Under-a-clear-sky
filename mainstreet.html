@@ -36,22 +36,22 @@
 <script>
 var scene = new THREE.Scene();
 scene.background = new THREE.Color(0xdfe9f2);
-scene.fog = new THREE.Fog(0xdfe9f2, 90, 260);
+scene.fog = new THREE.Fog(0xdfe9f2, 160, 420);
 var camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 500);
 camera.position.set(0, 8, 26);
 var renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.outputEncoding = THREE.sRGBEncoding;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMapping = THREE.NoToneMapping;
 document.getElementById('app') || document.body.appendChild(renderer.domElement);
 var controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 2, 0); controls.maxPolarAngle = Math.PI/2.05; controls.update();
-var sun = new THREE.DirectionalLight(0xfff2dd, 2.2); sun.position.set(40, 60, 30);
+var sun = new THREE.DirectionalLight(0xffffff, 1.9); sun.position.set(40, 60, 30);
 sun.castShadow = true; sun.shadow.mapSize.set(2048,2048);
 sun.shadow.camera.left=-40; sun.shadow.camera.right=40; sun.shadow.camera.top=40; sun.shadow.camera.bottom=-40;
 scene.add(sun);
-scene.add(new THREE.HemisphereLight(0xbfd8ee, 0x9a9484, 0.9));
+scene.add(new THREE.HemisphereLight(0xcfe8ff, 0xb0a890, 1.35));
 var ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 300),
   new THREE.MeshStandardMaterial({ color:0xb0b6ba, roughness:1 }));
 ground.rotation.x = -Math.PI/2; ground.position.y = -0.05; ground.receiveShadow = true;
