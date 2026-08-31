@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>晴空之下 · 岬咖啡 可进入预览</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:"PingFang SC","Microsoft YaHei",sans-serif; overflow:hidden; background:#dfe9f2; }
+  .hud { position:fixed; top:16px; left:16px; background:rgba(255,255,255,.88); color:#2c3a45;
+         border-radius:12px; padding:12px 18px; z-index:10; font-size:13px; line-height:1.7; }
+  .hud h1 { font-size:16px; margin-bottom:4px; }
+  #tip { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,.9);
+         padding:8px 16px; border-radius:10px; font-size:13px; color:#2c3a45; z-index:10; }
+</style>
+<script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://unpkg.com/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+<div class="hud"><h1>晴空之下 · 岬咖啡（可进入）</h1>
+<p>点击咖啡店大门 → 走进室内（吧台/货架/桌椅/吊灯）<br>再点门走出</p></div>
+<div id="tip">👆 点击咖啡店大门进入室内</div>
+<script>
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0xdfe9f2);
+var camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 300);
+camera.position.set(0, 4, 14);
+var renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+var controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2.5, 0); controls.maxPolarAngle = Math.PI/2.05; controls.update();
+var sun = new THREE.DirectionalLight(0xfff2dd, 2.2); sun.position.set(25, 35, 20); scene.add(sun);
+var hemi = new THREE.HemisphereLight(0xbfd8ee, 0x9a9484, 0.95); scene.add(hemi);
+var inLight = new THREE.PointLight(0xffd6a0, 0, 12); inLight.position.set(0, 2.6, -1); scene.add(inLight);
+var ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 90),
+  new THREE.MeshStandardMaterial({ color:0xb8bcc0, roughness:1 }));
+ground.rotation.x = -Math.PI/2; ground.position.y = -0.02; ground.receiveShadow = true;
+scene.add(ground);
+var facade=null, doorMesh=null, loaded=0;
+function mark(){ if (++loaded===2) {} }
+new THREE.GLTFLoader().load('models/cafe07.glb', function(g){
+  facade = g.scene;
+  facade.traverse(function(o){
+    if (o.isMesh){
+      o.castShadow = o.receiveShadow = true;
+      var bb = new THREE.Box3().setFromObject(o);
+      if (bb.max.z > 3.0 && bb.min.y < 0.6 && (bb.max.y-bb.min.y) > 1.8 && (bb.max.x-bb.min.x) < 2.0) doorMesh = o;
+    }
+  });
+  scene.add(facade); mark();
+});
+new THREE.GLTFLoader().load('models/cafe07_interior.glb', function(g){
+  g.scene.traverse(function(o){ if (o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  scene.add(g.scene); mark();
+});
+var inside = false;
+function toggle(){
+  inside = !inside;
+  if (inside){
+    camera.position.set(0, 1.7, 6); controls.target.set(0, 1.4, -2);
+    inLight.intensity = 1.4; hemi.intensity = 0.5;
+    document.getElementById('tip').textContent = '🚪 已进入岬咖啡 · 点击门走出';
+  } else {
+    camera.position.set(0, 4, 14); controls.target.set(0, 2.5, 0);
+    inLight.intensity = 0; hemi.intensity = 0.95;
+    document.getElementById('tip').textContent = '👆 点击咖啡店大门进入室内';
+  }
+  controls.update();
+}
+var ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+renderer.domElement.addEventListener('click', function(ev){
+  if (!facade) return;
+  mouse.x = (ev.clientX/innerWidth)*2-1;
+  mouse.y = -(ev.clientY/innerHeight)*2+1;
+  ray.setFromCamera(mouse, camera);
+  var targets = doorMesh ? [doorMesh] : facade.children;
+  if (targets.length && ray.intersectObjects(targets, true).length) toggle();
+});
+addEventListener('resize', function(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+(function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+</script>
+</body>
+</html>
