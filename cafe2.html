@@ -5003,9 +5003,6 @@
 </head>
 <body>
 <div id="app"></div>
-<div class="hud"><h1>晴空之下 · 岬咖啡（可进入）</h1><p>点击咖啡店大门 → 走进室内（吧台/货架/桌椅/吊灯）<br>再点门或按「回到街景」走出</p></div>
-<div class="bar"><button id="bReset">🔁 回到街景</button></div>
-<div id="load">岬咖啡加载中…</div>
 <div id="lockOverlay" style="display:flex;position:fixed;inset:0;z-index:15;align-items:center;justify-content:center;background:rgba(20,30,40,.35);cursor:pointer;">
   <div style="background:rgba(255,255,255,.92);color:#2c3a45;padding:22px 34px;border-radius:14px;text-align:center;font-size:15px;line-height:2;">
     <b style="font-size:18px;">点击进入 · 第一人称漫游</b><br>
@@ -5162,8 +5159,7 @@ loadGlb('glbInterior', function(g){
 function tick(){
   requestAnimationFrame(tick);
   var dt = Math.min(clock.getDelta(), 0.05);
-  if (locked) updateMove(dt);
-  else { camera.position.copy(cam.pos); camera.rotation.set(0,0,0); camera.rotateY(cam.yaw); camera.rotateX(cam.pitch); }
+  updateMove(dt);
   renderer.render(scene, camera);
 }
 addEventListener('resize', function(){
