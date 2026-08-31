@@ -5082,8 +5082,10 @@ var cam = { yaw: 0, pitch: -0.05, pos: new THREE.Vector3(0, 1.65, 18) };
 var keys = {};
 var locked = false;
 var overlay = document.getElementById('lockOverlay');
-renderer.domElement.addEventListener('click', function(){ if(!locked) renderer.domElement.requestPointerLock(); });
-overlay.addEventListener('click', function(){ renderer.domElement.requestPointerLock(); });
+function hideOverlay(){ if (overlay) overlay.style.display = 'none'; }
+renderer.domElement.addEventListener('click', function(){ hideOverlay(); if(!locked) renderer.domElement.requestPointerLock(); });
+overlay.addEventListener('click', function(){ hideOverlay(); renderer.domElement.requestPointerLock(); });
+setTimeout(hideOverlay, 8000); // 保险：无论加载状态如何，8秒后必隐藏
 document.addEventListener('pointerlockchange', function(){
   locked = (document.pointerLockElement === renderer.domElement);
   overlay.style.display = locked ? 'none' : 'flex';
@@ -5154,7 +5156,7 @@ function markLoaded(){
   loadedN++;
   if (loadedN === 2){
     document.getElementById('load').classList.add('done');
-    setTimeout(function(){ document.getElementById('lockOverlay').style.display = 'none'; }, 2500);
+    document.getElementById('lockOverlay').style.display = 'none';
   }
 }
 loadGlb('glbCafe', function(g){
