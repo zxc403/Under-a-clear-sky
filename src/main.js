@@ -162,6 +162,7 @@ async function boot() {
     placeGLB('models/fishshop_02.glb', -15, 6, Math.PI / 2, 'fishshop_02', 1.12);
     placeGLB('models/cafe_03.glb', 15, 6, -Math.PI / 2, 'cafe_03', 1.12);
     placeGLB('models/store_04.glb', -15, -10, Math.PI / 2, 'store_04', 1.12);
+    placeGLB('models/residence_05.glb', 15, -10, -Math.PI / 2, 'residence_05', 1.12);
     // 调试:?debug=1 放红色占位方块于同坐标,区分"坐标不可见"vs"模型问题"
     if (new URLSearchParams(location.search).get('debug') === '1') {
       const dbg = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 4), new THREE.MeshBasicMaterial({ color: 0xff2020 }));

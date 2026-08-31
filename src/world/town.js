@@ -139,7 +139,7 @@ export function createTown() {
   // 精装保留区:这些 z 区间的灰盒跳过,由 main.js 的 GLB 精装建筑替换(02/03/04)
   const reserved = [
     { side: -1, z0: -16, z1: 12 },  // 西侧: 04 杂货铺(z≈-10) + 02 水产店(z≈6)
-    { side: 1, z0: 0, z1: 12 },     // 东侧: 03 咖啡馆(z≈6)
+    { side: 1, z0: -16, z1: 12 },    // 东侧: 03 咖啡馆(z≈6) + 05 住宅(z≈-10)
   ];
   for (const side of [-1, 1]) {
     let z = -206;
