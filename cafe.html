@@ -5036,6 +5036,12 @@ function loadGlb(id, cb) {
 </script>
 <script>
 
+window.onerror = function(m, s, l){
+  var el = document.getElementById('load');
+  if (el) el.innerHTML = '<span id="err">脚本错误: ' + m + ' @line' + l + '</span>';
+  return false;
+};
+
 var scene = new THREE.Scene();
 scene.background = new THREE.Color(0xcfe3f5);
 scene.fog = new THREE.Fog(0xcfe3f5, 120, 420);
