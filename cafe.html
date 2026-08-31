@@ -5029,9 +5029,17 @@ function glbBuf(id) {
   return u8.buffer;
 }
 function loadGlb(id, cb) {
-  var loader = new THREE.GLTFLoader();
-  loader.parse(glbBuf(id), '', function(g){ cb(g); }, function(e){ console.error(e);
-    document.getElementById('load').innerHTML = '<span id="err">模型解析失败：'+e+'</span>'; });
+  try {
+    if (!window.THREE) { document.getElementById('load').innerHTML = '<span id="err">THREE 未加载</span>'; return; }
+    if (!THREE.GLTFLoader) { document.getElementById('load').innerHTML = '<span id="err">GLTFLoader 未加载 (three=' + (THREE.REVISION||'?') + ')</span>'; return; }
+    if (!window[id]) { document.getElementById('load').innerHTML = '<span id="err">数据块缺失: ' + id + '</span>'; return; }
+    var loader = new THREE.GLTFLoader();
+    loader.parse(glbBuf(id), '', function(g){ cb(g); }, function(e){
+      document.getElementById('load').innerHTML = '<span id="err">模型解析失败: ' + e + '</span>';
+    });
+  } catch (err) {
+    document.getElementById('load').innerHTML = '<span id="err">加载异常: ' + err.message + '</span>';
+  }
 }
 </script>
 <script>
