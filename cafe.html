@@ -5013,79 +5013,26 @@
   </div>
 </div>
 <script>
-
-var scene = new THREE.Scene();
-scene.background = new THREE.Color(0xdfe9f2);
-scene.fog = new THREE.Fog(0xdfe9f2, 50, 160);
-var camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 300);
-camera.position.set(0, 4, 14);
-var renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.outputEncoding = THREE.sRGBEncoding;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
-document.getElementById('app').appendChild(renderer.domElement);
-var controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 2.5, 0); controls.maxPolarAngle = Math.PI/2.05; controls.update();
-var sun = new THREE.DirectionalLight(0xfff2dd, 2.2); sun.position.set(25, 35, 20); scene.add(sun);
-var hemi = new THREE.HemisphereLight(0xbfd8ee, 0x9a9484, 0.95); scene.add(hemi);
-var inLight = new THREE.PointLight(0xffd6a0, 0, 12); inLight.position.set(0, 2.6, -1); scene.add(inLight);
-var ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 90),
-  new THREE.MeshStandardMaterial({ color:0xb8bcc0, roughness:1 }));
-ground.rotation.x = -Math.PI/2; ground.position.y = -0.02; ground.receiveShadow = true;
-scene.add(ground);
-var facade = null, doorMesh = null, loadedN = 0;
-function markLoaded(){ loadedN++; if (loadedN === 2) document.getElementById('load').classList.add('done'); }
-loadGlb('glbCafe', function(g){
-  facade = g.scene;
-  facade.traverse(function(o){
-    if (o.isMesh){
-      o.castShadow = o.receiveShadow = true;
-      var bb = new THREE.Box3().setFromObject(o);
-      if (bb.max.z > 3.0 && bb.min.y < 0.6 && (bb.max.y-bb.min.y) > 1.8 && (bb.max.x-bb.min.x) < 2.0) doorMesh = o;
-    }
-  });
-  scene.add(facade); markLoaded();
-});
-loadGlb('glbInterior', function(g){
-  g.scene.traverse(function(o){ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
-  scene.add(g.scene); markLoaded();
-});
-var inside = false;
-function toggle(){
-  inside = !inside;
-  if (inside){
-    camera.position.set(0, 1.7, 6); controls.target.set(0, 1.4, -2);
-    inLight.intensity = 1.4; hemi.intensity = 0.5;
-    document.getElementById('tipText').textContent = '🚪 已进入岬咖啡 · 点击门走出';
-  } else {
-    camera.position.set(0, 4, 14); controls.target.set(0, 2.5, 0);
-    inLight.intensity = 0; hemi.intensity = 0.95;
-    document.getElementById('tipText').textContent = '👆 点击咖啡店大门进入室内';
+// GLB base64 数据块读取（容错解码：剔除一切非 b64 字符，纯 JS 位运算，不依赖 atob）
+function glbBuf(id) {
+  var s = String(window[id]).replace(/[^A-Za-z0-9+\/=]/g, '');
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  var out = [], bits = 0, acc = 0;
+  for (var i = 0; i < s.length; i++) {
+    var c = s[i]; if (c === '=') break;
+    var v = chars.indexOf(c); if (v < 0) continue;
+    acc = (acc << 6) | v; bits += 6;
+    if (bits >= 8) { bits -= 8; out.push(String.fromCharCode((acc >> bits) & 0xFF)); }
   }
-  controls.update();
+  var bin = out.join(''), n = bin.length, u8 = new Uint8Array(n);
+  for (var k = 0; k < n; k++) u8[k] = bin.charCodeAt(k) & 0xFF;
+  return u8.buffer;
 }
-// 提示条
-var tip = document.createElement('div');
-tip.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(255,255,255,.9);padding:8px 16px;border-radius:10px;font-size:13px;color:#2c3a45;';
-tip.innerHTML = '<span id="tipText">👆 点击咖啡店大门进入室内</span>';
-document.body.appendChild(tip);
-var ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
-renderer.domElement.addEventListener('click', function(ev){
-  if (!facade) return;
-  mouse.x = (ev.clientX/innerWidth)*2-1;
-  mouse.y = -(ev.clientY/innerHeight)*2+1;
-  ray.setFromCamera(mouse, camera);
-  var targets = doorMesh ? [doorMesh] : facade.children;
-  if (targets.length && ray.intersectObjects(targets, true).length) toggle();
-});
-document.getElementById('bReset').onclick = function(){
-  if (inside) toggle(); else { camera.position.set(0,4,14); controls.target.set(0,2.5,0); controls.update(); }
-};
-addEventListener('resize', function(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
-(function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); })();
-
+function loadGlb(id, cb) {
+  var loader = new THREE.GLTFLoader();
+  loader.parse(glbBuf(id), '', function(g){ cb(g); }, function(e){ console.error(e);
+    document.getElementById('load').innerHTML = '<span id="err">模型解析失败：'+e+'</span>'; });
+}
 </script>
 <script>
 
