@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>06号便利店 v7 白盒比例层 · 真实光照</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#87b8e6}#info{position:fixed;left:10px;top:10px;color:#fff;font:12px/1.6 sans-serif;background:rgba(20,40,70,.55);padding:8px 12px;border-radius:8px;pointer-events:none}</style>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="info">06号便利店 v6 · 真实光照管线（暖阳光 + PCFSoft 阴影 + ACES）<br>鼠标左键拖动旋转 · 滚轮缩放 · 右键平移</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.045;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xDCEBFA, 100, 720);
+
+// 天空渐变（与本体 G 轮同源：天顶蓝→地平线亮白蓝）
+const skyGeo = new THREE.SphereGeometry(900, 32, 16);
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  uniforms: {},
+  vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `varying vec3 vP;
+    void main(){
+      float h = normalize(vP).y;
+      vec3 top = vec3(0.08,0.32,0.92);
+      vec3 mid = vec3(0.27,0.53,0.97);
+      vec3 hor = vec3(0.82,0.94,1.02);
+      vec3 c = h>0.25 ? mix(mid,top,smoothstep(0.25,0.9,h)) : mix(hor,mid,smoothstep(-0.05,0.25,h));
+      gl_FragColor = vec4(c,1.0);
+    }`
+});
+scene.add(new THREE.Mesh(skyGeo, skyMat));
+
+// 阳光（暖色 2.95，与本体一致）
+const sun = new THREE.DirectionalLight(0xffd8a8, 2.95);
+sun.position.set(30, 42, 24);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-40; sun.shadow.camera.right=40;
+sun.shadow.camera.top=40; sun.shadow.camera.bottom=-40;
+sun.shadow.camera.far=140; sun.shadow.bias=-0.0004;
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xbfd9ff, 0xe8dcc8, 0.55));
+
+// 地面（沙色，柔化版）
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(400,400),
+  new THREE.MeshLambertMaterial({color:0xEBE4D2})
+);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+new GLTFLoader().load('models/store06_v7_whitebox.glb', (g)=>{
+  const m = g.scene;
+  m.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  scene.add(m);
+  const box = new THREE.Box3().setFromObject(m);
+  const c = box.getCenter(new THREE.Vector3());
+  const cam = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 2000);
+  cam.position.set(c.x+16, c.y+9, c.z+20);
+  const ctl = new OrbitControls(cam, renderer.domElement);
+  ctl.target.copy(c);
+  ctl.enableDamping = true;
+  addEventListener('resize', ()=>{ cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+  (function loop(){ requestAnimationFrame(loop); ctl.update(); renderer.render(scene,cam); })();
+});
+</script>
+</body>
+</html>
