@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>06号便利店 v9 · 程序化贴图流</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#a9d2f0}
+#hud{position:fixed;left:10px;top:10px;right:10px;color:#fff;font:12px/1.7 system-ui,sans-serif;
+background:rgba(16,38,66,.55);padding:9px 12px;border-radius:8px;pointer-events:none;z-index:5}
+#hud b{font-weight:600}
+#msg{position:fixed;left:10px;bottom:10px;right:10px;color:#fff;font:12px/1.7 ui-monospace,monospace;
+background:rgba(120,20,20,.82);padding:10px 12px;border-radius:8px;display:none;white-space:pre-wrap;z-index:6}
+</style>
+</head>
+<body>
+<div id="hud"><b>06号便利店 v9 · 程序化贴图流</b><br>
+依赖已本地化（不依赖外部 CDN）· 贴图 256 · 拖动旋转 / 双指缩放</div>
+<div id="msg"></div>
+
+<script>
+// 全局错误 → 直接显示在页面上，杜绝静默白屏
+function err(t){ var m=document.getElementById('msg'); m.style.display='block'; m.textContent = t; }
+window.addEventListener('error', e=>{
+  err('✗ 脚本错误: ' + (e.message||'') + '\n' + (e.filename||'') + ':' + (e.lineno||''));
+}, true);
+window.addEventListener('unhandledrejection', e=>{
+  err('✗ 加载失败: ' + (e.reason && (e.reason.message||e.reason) || '未知'));
+});
+var ok=false;
+setTimeout(()=>{ if(!ok) err('✗ 20 秒内未能启动渲染。\n可能是模型或本地依赖未加载。请把这段提示截图发我。'); }, 20000);
+</script>
+
+<script type="importmap">
+{"imports":{
+  "three":"./libs/three.module.js",
+  "three/addons/":"./libs/addons/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+try {
+  const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.16;
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0xDCEDFB, 120, 900);
+
+  // 天空渐变
+  const skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    vertexShader:`varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+    fragmentShader:`varying vec3 vP;
+      void main(){ float h=normalize(vP).y;
+        vec3 top=vec3(0.15,0.41,0.86); vec3 mid=vec3(0.42,0.66,0.94); vec3 hor=vec3(0.90,0.95,0.99);
+        vec3 c = h>0.22 ? mix(mid,top,smoothstep(0.22,0.9,h)) : mix(hor,mid,smoothstep(-0.08,0.22,h));
+        gl_FragColor=vec4(c,1.0);} `
+  });
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(1000, 32, 16), skyMat));
+
+  // 环境反射：直接用天空生成，不再依赖外部 RoomEnvironment
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const skyScene = new THREE.Scene();
+  skyScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 24, 12), skyMat));
+  scene.environment = pmrem.fromScene(skyScene, 0.04).texture;
+  if ('environmentIntensity' in scene) scene.environmentIntensity = 0.6;
+  pmrem.dispose();
+
+  // 光照：中性暖白 + 高环境光（清亮路线）
+  const sun = new THREE.DirectionalLight(0xfff2e2, 2.15);
+  sun.position.set(26, 40, -18);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  Object.assign(sun.shadow.camera, {left:-38,right:38,top:38,bottom:-38,far:150});
+  sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03;
+  scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0xd6ecff, 0xE6E0D2, 1.12));
+  const fill = new THREE.DirectionalLight(0xdfe9ff, 0.35);
+  fill.position.set(-24, 18, 22); scene.add(fill);
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(600, 600),
+    new THREE.MeshStandardMaterial({color:0xEDE7D8, roughness:0.95})
+  );
+  ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+
+  const cam = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 3000);
+  cam.position.set(6, 6.2, -28);
+  const ctl = new OrbitControls(cam, renderer.domElement);
+  ctl.target.set(0, 3.4, -4);
+  ctl.enableDamping = true; ctl.dampingFactor = 0.08;
+  ctl.maxPolarAngle = Math.PI*0.495;
+  ctl.minDistance = 6; ctl.maxDistance = 90;
+
+  // 先用相机把天空渲染起来（即使模型失败也不是白屏）
+  let t = 0;
+  (function loop(){ requestAnimationFrame(loop); t++;
+    if (t % 2 === 0) ctl.update(); renderer.render(scene, cam); })();
+  ok = true;
+
+  new GLTFLoader().load('models/store06_v9.glb',
+    (g)=>{
+      const root = g.scene;
+      root.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+      scene.add(root);
+      const box = new THREE.Box3().setFromObject(root);
+      const c = box.getCenter(new THREE.Vector3());
+      ctl.target.set(c.x, c.y * 0.55 + 1.2, c.z + 1);
+      cam.position.set(c.x + 6, 6.2, c.z - 24);
+      ctl.update();
+      err('✓ 模型已加载（此提示仅本次显示）');
+      setTimeout(()=>{ document.getElementById('msg').style.display='none'; }, 1500);
+    },
+    (p)=>{ if (p.total) err('加载中 ' + Math.round(p.loaded/p.total*100) + '%'); },
+    (e)=>{ err('✗ 模型加载失败: ' + (e && (e.message||e.type) || e)); }
+  );
+
+  addEventListener('resize', ()=>{
+    cam.aspect = innerWidth/innerHeight; cam.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+} catch (e) {
+  err('✗ 初始化异常: ' + (e && e.message || e));
+}
+</script>
+</body>
+</html>

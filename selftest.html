@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>环境自测 · 3D 能否运行</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body{margin:0;height:100%;background:#123;color:#eaf4ff;font:15px/1.8 system-ui,sans-serif}
+#box{padding:18px}
+#msg{background:rgba(255,255,255,.08);border-left:4px solid #6cf;padding:12px 14px;border-radius:6px;
+white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:13px}
+.ok{color:#7fe0a0}.bad{color:#ff8f8f}
+#cv{position:fixed;inset:0;z-index:-1}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="box">
+  <h2 style="margin:0 0 10px">环境自测</h2>
+  <div id="msg">正在初始化…</div>
+</div>
+<script>
+// 尽早挂错误捕获，任何异常都显示到页面上（绝不静默白屏）
+window.__err = [];
+function show(t){
+  var m = document.getElementById('msg');
+  m.innerHTML = t;
+}
+window.addEventListener('error', e=>{
+  window.__err.push(String(e.message));
+  show('<span class="bad">✗ 发生错误</span>\n\n'+e.message+'\n'+(e.filename||'')+':'+(e.lineno||''));
+}, true);
+window.addEventListener('unhandledrejection', e=>{
+  show('<span class="bad">✗ Promise 失败</span>\n\n'+(e.reason && (e.reason.message||e.reason)));
+});
+// 8 秒看门狗
+var done=false;
+setTimeout(()=>{ if(!done) show('<span class="bad">✗ 8 秒内未完成初始化</span>\n\n脚本可能被拦截，或本地 three 库未加载。\n请把这个提示截图给我。'); }, 8000);
+</script>
+
+<script type="importmap">
+{"imports":{"three":"./libs/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+const cv = document.getElementById('cv');
+let gl2=false;
+try { gl2 = !!cv.getContext('webgl2'); } catch(e){}
+if (!gl2) {
+  show('<span class="bad">✗ 当前浏览器不支持 WebGL2</span>\n\n3D 场景无法运行。');
+} else {
+  const r = new THREE.WebGLRenderer({canvas:cv, antialias:false});
+  r.setPixelRatio(Math.min(devicePixelRatio,1.5));
+  r.setSize(innerWidth, innerHeight);
+  const sc = new THREE.Scene();
+  sc.background = new THREE.Color(0x1d3a5c);
+  const cam = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, .1, 100);
+  cam.position.set(0,1.6,4.2);
+  const cube = new THREE.Mesh(
+    new THREE.BoxGeometry(1.4,1.4,1.4),
+    new THREE.MeshStandardMaterial({color:0x5ad1ff, roughness:.35, metalness:.1})
+  );
+  sc.add(cube);
+  sc.add(new THREE.HemisphereLight(0xbfe4ff, 0x335577, 1.6));
+  const dl = new THREE.DirectionalLight(0xffffff, 2.0); dl.position.set(3,5,3); sc.add(dl);
+  sc.add(new THREE.GridHelper(10, 10, 0x6ea8d8, 0x2c4a6d));
+  (function loop(){ requestAnimationFrame(loop);
+    cube.rotation.x += .008; cube.rotation.y += .013; r.render(sc, cam); })();
+  addEventListener('resize', ()=>{ cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix();
+    r.setSize(innerWidth, innerHeight); });
+  done = true;
+  show('<span class="ok">✓ 环境正常：WebGL2 可用，本地 three 加载成功</span>\n\n'
+    + 'Renderer: ' + (r.capabilities && r.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL') + '\n'
+    + 'three r' + THREE.REVISION + '\n'
+    + 'GPU: ' + (function(){ try{ const g=r.getContext(); const d=g.getExtension('WEBGL_debug_renderer_info');
+        return d ? g.getParameter(d.UNMASKED_RENDERER_WEBGL) : '未暴露'; }catch(e){ return '未知'; } })() + '\n\n'
+    + '如果你能看到一个转动的蓝色方块 → 环境没问题，白屏是页面资源问题。');
+}
+</script>
+</body>
+</html>
