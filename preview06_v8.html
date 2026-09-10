@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>06号便利店 v8 · 程序化贴图流</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#9fc9ee}
+#info{position:fixed;left:10px;top:10px;color:#fff;font:12px/1.7 sans-serif;
+background:rgba(20,40,70,.5);padding:8px 12px;border-radius:8px;pointer-events:none;z-index:9}</style>
+<script type="importmap">{"imports":{
+"three":"https://unpkg.com/three@0.170.0/build/three.module.js",
+"three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="info">06号便利店 v8 · 程序化贴图流（白瓷砖/卷帘/海报/条纹雨棚 全部程序化生成）<br>
+清亮大气：中性暖白阳光 + 高环境光 + 环境反射 · 拖动旋转 / 滚轮缩放</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// 清亮路线：ACES + 稍高曝光，避免整体发灰
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+// 环境反射（玻璃/金属用），强度压低保持清亮不油腻
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+scene.fog = new THREE.Fog(0xDCEDFB, 120, 900);
+
+// 天空渐变：天顶亮蓝→地平线近白（清亮、不发紫）
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(1200, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    vertexShader:`varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+    fragmentShader:`varying vec3 vP;
+      void main(){ float h=normalize(vP).y;
+        vec3 top=vec3(0.16,0.42,0.86); vec3 mid=vec3(0.42,0.66,0.94); vec3 hor=vec3(0.90,0.95,0.99);
+        vec3 c = h>0.22 ? mix(mid,top,smoothstep(0.22,0.9,h)) : mix(hor,mid,smoothstep(-0.08,0.22,h));
+        gl_FragColor=vec4(c,1.0);} `
+  })
+);
+scene.add(sky);
+
+// 阳光：中性暖白（不是橙），强度克制
+const sun = new THREE.DirectionalLight(0xfff2e2, 2.1);
+sun.position.set(26, 40, -18);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera, {left:-38,right:38,top:38,bottom:-38,far:150});
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.03;
+scene.add(sun);
+// 半球光拉高：暗部透气，整体清亮
+scene.add(new THREE.HemisphereLight(0xd6ecff, 0xE6E0D2, 1.15));
+// 补一盏很弱的反向散射，压死黑块
+const fill = new THREE.DirectionalLight(0xdfe9ff, 0.35);
+fill.position.set(-24, 18, 22);
+scene.add(fill);
+
+// 地面（沙色，接住阴影）
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(600,600),
+  new THREE.MeshStandardMaterial({color:0xEDE7D8, roughness:0.95, metalness:0.0})
+);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+new GLTFLoader().load('models/store06_v8.glb', (g)=>{
+  const root = g.scene;
+  root.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true;
+    if(o.material){ o.material.roughness = Math.min(o.material.roughness ?? 0.9, 0.92); } } });
+  scene.add(root);
+  const box = new THREE.Box3().setFromObject(root);
+  const c = box.getCenter(new THREE.Vector3());
+  const cam = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 3000);
+  cam.position.set(c.x+6, 6.2, c.z-24);
+  const ctl = new OrbitControls(cam, renderer.domElement);
+  ctl.target.set(c.x, 3.4, c.z+1);
+  ctl.enableDamping = true; ctl.dampingFactor = 0.08;
+  ctl.maxPolarAngle = Math.PI*0.495;
+  addEventListener('resize', ()=>{ cam.aspect=innerWidth/innerHeight;
+    cam.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+  (function loop(){ requestAnimationFrame(loop); ctl.update(); renderer.render(scene,cam); })();
+}, undefined, (e)=>{
+  document.getElementById('info').textContent = 'GLB 加载失败: ' + e;
+});
+</script>
+</body>
+</html>
