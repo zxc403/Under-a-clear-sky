@@ -65,9 +65,10 @@
 
   #err{
     left:16px; bottom:16px; padding:10px 14px; font-size:12px; color:var(--warn);
-    display:none; max-width:min(420px,80vw)
+    display:none; max-width:min(440px,80vw); line-height:1.6
   }
   #err.show{display:block}
+  #err code{font-size:11px; color:var(--ink-soft)}
   .hint{font-size:11px; color:var(--ink-soft)}
   @media (max-width:560px){
     .hud{max-width:64vw; padding:11px 13px}
@@ -115,16 +116,24 @@
 
 <script type="module">
 /* =====================================================================
-   零依赖装配：不使用 importmap。
-   three 与其 addons 都以动态 import 载入；addons 源码里的裸名
-   `from 'three'` 与相对路径会在运行时改写成绝对地址后，以 Blob 模块导入。
+   零 importmap 装配：three 与 addons 全部动态 import。
+   addons 源码里的裸名 `from 'three'` 与相对引用，运行时改写成绝对地址后
+   以 Blob 模块导入，从而在无 importmap 的静态托管上也能解析。
    ===================================================================== */
+function fail(msg, detail){
+  const e = document.getElementById('err');
+  e.innerHTML = msg + (detail ? '<br><code>' + String(detail).slice(0,200) + '</code>' : '');
+  e.classList.add('show');
+  document.getElementById('load').classList.add('done');
+}
+function fatal(msg, detail){ fail(msg, detail); }
+
 const BASE = document.baseURI;
 const THREE_URL = new URL('./libs/three.module.js', BASE).href;
 
 async function importAddon(rel){
   const abs = new URL(rel, BASE).href;
-  const res = await fetch(abs);
+  const res = await fetch(abs, { cache:'force-cache' });
   if(!res.ok) throw new Error(rel + ' -> HTTP ' + res.status);
   let src = await res.text();
   src = src.replace(
@@ -139,16 +148,22 @@ async function importAddon(rel){
   return import(url);
 }
 
-const THREE = await import('./libs/three.module.js');
-const { OrbitControls } = await importAddon('./libs/addons/controls/OrbitControls.js');
-const { GLTFLoader } = await importAddon('./libs/addons/loaders/GLTFLoader.js');
+let THREE, OrbitControls, GLTFLoader;
+try{
+  THREE = await import('./libs/three.module.js');
+  OrbitControls = (await importAddon('./libs/addons/controls/OrbitControls.js')).OrbitControls;
+  GLTFLoader = (await importAddon('./libs/addons/loaders/GLTFLoader.js')).GLTFLoader;
+}catch(e){
+  fatal('三维引擎未能载入，无法显示街景。', e && e.message);
+  throw e;
+}
 
 /* ---------- 常量 ---------- */
 const SKY = 0xdfe9f2;
 const GAME_SCALE = 1.12;
 const TARGET_H = 9.27 * GAME_SCALE;   /* 邻栋 store_04 高 9.27 × 1.12 ≈ 10.4 */
 
-/* 邻栋：游戏 SPA 的真实位姿表 n(url, x, z, rotY, label, scale) */
+/* 邻栋：游戏 SPA 真实位姿表 n(url, x, z, rotY, label, scale) */
 const NEIGHBOURS = [
   { url:'models/bbq_08.glb',        x:-15, z:  8, rot:-Math.PI/2 },
   { url:'models/shopstreet_09.glb', x:-15, z: -6, rot:-Math.PI/2 },
@@ -159,12 +174,16 @@ const NEIGHBOURS = [
   { url:'models/office_13.glb',     x: 15, z:-12, rot: Math.PI/2 },
 ];
 const SLOT = { x:-15, z:22, rot:-Math.PI/2 };
+const SRC  = { mine:'recon_page/store_v2.glb', game:'models/store_04.glb' };
 
-const SRC = { mine:'recon_page/store_v2.glb', game:'models/store_04.glb' };
+/* 我的资产是"地景式"导出：剔除承托板 / 棕榈 / 电线杆，保留遮阳伞与街具 */
+function isClutter(name){
+  const n = (name || '').toLowerCase();
+  if(/umbrella|umpole/.test(n)) return false;             /* 遮阳伞保留 */
+  return /(asphalt|ground|slab|plane|palm|tree|trunk|leaf|bloss|pole|wire|cross|^pot|^br\d)/.test(n);
+}
 
-/* 我的资产是"地景式"导出：剔除承托板与街景植被，只留店面 + 设备 + Gate4 街具 */
-const STRIP = /(asphalt|ground|slab|plane|palm|tree|trunk|leaf|bloss|^pole|^pot|wire|cross|^br\d)/;
-
+try{
 /* ---------- 场景（复刻游戏 mainstreet 环境） ---------- */
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(SKY);
@@ -176,7 +195,11 @@ camera.position.set(0, 9, 30);
 const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.outputEncoding = THREE.sRGBEncoding;
+if('outputColorSpace' in renderer && THREE.SRGBColorSpace){
+  renderer.outputColorSpace = THREE.SRGBColorSpace;        /* three r152+ */
+}else if(THREE.sRGBEncoding !== undefined){
+  renderer.outputEncoding = THREE.sRGBEncoding;            /* three 旧版 */
+}
 renderer.toneMapping = THREE.NoToneMapping;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -209,7 +232,7 @@ ground.position.y = -0.05;
 ground.receiveShadow = true;
 scene.add(ground);
 
-/* ---------- 载入 ---------- */
+/* ---------- 工具 ---------- */
 const loader = new GLTFLoader();
 function shade(root){
   root.traverse(function(o){
@@ -235,18 +258,13 @@ function step(){
   nEl.textContent = doneN + ' / ' + TOTAL;
   if(pending === 0) document.getElementById('load').classList.add('done');
 }
-function fail(msg){
-  const e = document.getElementById('err');
-  e.textContent = '部分模型未能载入：' + msg + '（可先斜视街景，检查网络后刷新）';
-  e.classList.add('show');
-}
 
 NEIGHBOURS.forEach(function(def){
   const holder = slotGroupOf(def);
   scene.add(holder);
   loader.load(def.url, function(g){
     shade(g.scene); holder.add(g.scene); step();
-  }, undefined, function(){ fail(def.url); step(); });
+  }, undefined, function(){ step(); });
 });
 
 /* ---------- 06 槽位 ---------- */
@@ -262,11 +280,8 @@ function applyNudge(){ slot.rotation.y = SLOT.rot + rotNudge; }
 
 /* 剔除承托板/植被 → 等比拟合到邻栋尺度 → 居中落地 */
 function fitAsset(root){
-  root.updateMatrixWorld(true);
   const kill = [];
-  root.traverse(function(o){
-    if(o.isMesh && STRIP.test((o.name || '').toLowerCase())) kill.push(o);
-  });
+  root.traverse(function(o){ if(o.isMesh && isClutter(o.name)) kill.push(o); });
   kill.forEach(function(o){ if(o.parent) o.parent.remove(o); });
 
   root.updateMatrixWorld(true);
@@ -309,13 +324,13 @@ function mount(mode){
     setBtn('bMine', mode === 'mine');
     setBtn('bGame', mode === 'game');
   }, undefined, function(){
-    fail(url);
+    fail('06 槽位模型载入失败：' + url);
     hudMode.innerHTML = '<span class="tag alt">载入失败</span> ' + url;
     step();
   });
 }
 
-/* ---------- 视图 ---------- */
+/* ---------- 视图与交互 ---------- */
 const VIEWS = {
   street: { pos:[0, 9, 30],      tgt:[0, 3, 0]    },
   top:    { pos:[0, 95, 4],      tgt:[0, 0, 4]    },
@@ -360,6 +375,9 @@ mount('mine');
   controls.update();
   renderer.render(scene, camera);
 })();
+}catch(e){
+  fatal('街景初始化失败。', e && e.message);
+}
 </script>
 </body>
 </html>
