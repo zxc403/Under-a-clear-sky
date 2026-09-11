@@ -237,6 +237,28 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
+
+/* sky backdrop: a kept-in-scene dome so the WebGL canvas never clears to black */
+{
+  const g = new THREE.SphereGeometry(300, 32, 20);
+  const m = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms:{
+      top:{ value:new THREE.Color(0x6f9fd0) },
+      mid:{ value:new THREE.Color(0xbcd2e6) },
+      bot:{ value:new THREE.Color(0xd8cbb4) }
+    },
+    vertexShader:'varying vec3 vp; void main(){ vp=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader:'varying vec3 vp; uniform vec3 top; uniform vec3 mid; uniform vec3 bot; void main(){ float h=clamp(normalize(vp).y*0.5+0.5,0.0,1.0); vec3 c = h<0.5 ? mix(bot,mid,smoothstep(0.28,0.5,h)) : mix(mid,top,smoothstep(0.5,0.70,h)); gl_FragColor=vec4(c,1.0); }'
+  });
+  const dome = new THREE.Mesh(g, m);
+  dome.name = 'SkyDome';
+  dome.raycast = function(){};           // never intercept taps
+  scene.add(dome);
+}
+scene.background = new THREE.Color(0xbcd2e6);
+scene.fog = new THREE.Fog(0xc3d3e2, 55, 260);
+
 const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 400);
 
 const orbit = new OrbitControls(camera, canvas);
@@ -287,9 +309,9 @@ scene.add(fill);
 /* ceiling practicals, only used indoors */
 const inLights = [];
 for (const [x, y, z, col, inten] of [
-  [-2.00, 2.66, 0.70, 0xfff1d6, 15.0], [0.00, 2.66, 0.70, 0xfff1d6, 15.0], [2.00, 2.66, 0.70, 0xfff1d6, 15.0],
-  [-2.00, 2.66, -1.90, 0xfff1d6, 15.0], [0.00, 2.66, -1.90, 0xfff1d6, 15.0], [2.00, 2.66, -1.90, 0xfff1d6, 15.0],
-  [-1.60, 1.60, -2.55, 0xcfe6ff, 6.5], [1.60, 1.60, -2.55, 0xcfe6ff, 6.5]
+  [-2.00, 2.66, 0.70, 0xfff1d6, 26.0], [0.00, 2.66, 0.70, 0xfff1d6, 26.0], [2.00, 2.66, 0.70, 0xfff1d6, 26.0],
+  [-2.00, 2.66, -1.90, 0xfff1d6, 26.0], [0.00, 2.66, -1.90, 0xfff1d6, 26.0], [2.00, 2.66, -1.90, 0xfff1d6, 26.0],
+  [-1.60, 1.60, -2.55, 0xcfe6ff, 11.0], [1.60, 1.60, -2.55, 0xcfe6ff, 11.0]
 ]) {
   const pl = new THREE.PointLight(col, inten, 11.0, 2.0);
   pl.position.set(x, y, z);
@@ -550,7 +572,8 @@ function setMode(next){
   orbit.autoRotate = false;
   sun.castShadow = !goingIn;
   sun.intensity = goingIn ? 1.05 : 2.9;
-  hemi.intensity = goingIn ? 0.95 : 0.55;
+  hemi.intensity = goingIn ? 1.35 : 0.55;
+  renderer.toneMappingExposure = goingIn ? 1.25 : 1.02;
   inLights.forEach(l => l.visible = goingIn);
   if (currentKey !== next) load(next);
   else { buildChrome(); applyView(MODES[next].views[0]); }
@@ -576,7 +599,8 @@ function load(key){
   orbit.enabled = !goingIn;
   sun.castShadow = !goingIn;
   sun.intensity = goingIn ? 1.05 : 2.9;
-  hemi.intensity = goingIn ? 0.95 : 0.55;
+  hemi.intensity = goingIn ? 1.35 : 0.55;
+  renderer.toneMappingExposure = goingIn ? 1.25 : 1.02;
   inLights.forEach(l => l.visible = goingIn);
   doorProxy = null;
   buildChrome();
