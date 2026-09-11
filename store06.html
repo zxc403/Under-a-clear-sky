@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>晴空之下 · 06 号便利店 街景挂载验收</title>
+<style>
+  :root{
+    --ink:#22303a; --ink-soft:#5b6b76; --panel:rgba(255,255,255,.90);
+    --line:rgba(34,48,58,.14); --brand:#3d8f6f; --brand-ink:#ffffff;
+    --warn:#b4531f; --radius:12px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--ink); background:#dfe9f2; overflow:hidden;
+  }
+  #app{position:fixed; inset:0}
+  canvas{display:block}
+
+  .panel{
+    position:fixed; z-index:10; background:var(--panel);
+    border:1px solid var(--line); border-radius:var(--radius);
+    backdrop-filter:saturate(1.1) blur(8px);
+    box-shadow:0 8px 26px rgba(24,40,54,.14);
+  }
+  .hud{top:16px; left:16px; padding:14px 18px; max-width:min(360px,72vw)}
+  .hud h1{font-size:16px; letter-spacing:.2px; margin-bottom:6px}
+  .hud .sub{font-size:12px; color:var(--ink-soft); line-height:1.65}
+  .hud dl{margin-top:10px; display:grid; grid-template-columns:auto 1fr; gap:3px 10px; font-size:11.5px}
+  .hud dt{color:var(--ink-soft)}
+  .hud dd{font-variant-numeric:tabular-nums}
+  .tag{
+    display:inline-block; padding:1px 7px; border-radius:999px; font-size:11px;
+    background:rgba(61,143,111,.14); color:#2f7358; border:1px solid rgba(61,143,111,.28)
+  }
+  .tag.alt{background:rgba(180,83,31,.12); color:var(--warn); border-color:rgba(180,83,31,.26)}
+
+  .bar{
+    left:50%; bottom:18px; transform:translateX(-50%);
+    display:flex; flex-wrap:wrap; gap:8px; padding:10px; justify-content:center;
+    max-width:calc(100vw - 32px);
+  }
+  .bar button{
+    appearance:none; border:1px solid var(--line); background:rgba(255,255,255,.7);
+    color:var(--ink); font-size:12.5px; padding:8px 13px; border-radius:9px;
+    cursor:pointer; transition:background .15s,border-color .15s,color .15s;
+    font-family:inherit; white-space:nowrap;
+  }
+  .bar button:hover{background:#fff; border-color:rgba(61,143,111,.5)}
+  .bar button.on{background:var(--brand); border-color:var(--brand); color:var(--brand-ink)}
+  .bar .sep{width:1px; align-self:stretch; background:var(--line); margin:2px 2px}
+
+  #load{
+    position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center;
+    background:#dfe9f2; transition:opacity .45s ease;
+  }
+  #load.done{opacity:0; pointer-events:none}
+  #load .box{text-align:center}
+  #load .t{font-size:14px; color:var(--ink)}
+  #load .bar2{width:240px; height:6px; background:#c5d2dd; border-radius:3px; margin:14px auto 0; overflow:hidden}
+  #load .fill{height:100%; width:0; background:var(--brand); transition:width .2s}
+  #load .n{font-size:11.5px; color:var(--ink-soft); margin-top:8px}
+
+  #err{
+    left:16px; bottom:16px; padding:10px 14px; font-size:12px; color:var(--warn);
+    display:none; max-width:min(420px,80vw)
+  }
+  #err.show{display:block}
+  .hint{font-size:11px; color:var(--ink-soft)}
+  @media (max-width:560px){
+    .hud{max-width:64vw; padding:11px 13px}
+    .hud dl{display:none}
+    .bar button{padding:7px 10px; font-size:12px}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<section class="panel hud" aria-label="场景说明">
+  <h1>晴空之下 · 06 号便利店</h1>
+  <p class="sub">游戏真实街景布局 · 06 槽位挂载验收</p>
+  <dl>
+    <dt>场景</dt><dd>主街（沿 Z 轴，两侧 x=±15）</dd>
+    <dt>06 槽位</dt><dd>x −15 · z 22 · 朝向 −90°</dd>
+    <dt>当前 06</dt><dd id="hudMode"><span class="tag">我的资产</span> store_v2.glb</dd>
+    <dt>邻栋</dt><dd>7 栋 · 游戏原版 · scale 1.12</dd>
+  </dl>
+  <p class="sub hint" style="margin-top:8px">拖拽旋转 · 滚轮缩放 · 右键平移</p>
+</section>
+
+<nav class="bar panel" aria-label="视图与对比控制">
+  <button id="bStreet" class="on" type="button">街道视角</button>
+  <button id="bTop" type="button">鸟瞰</button>
+  <button id="bClose" type="button">06 特写</button>
+  <span class="sep" aria-hidden="true"></span>
+  <button id="bMine" class="on" type="button">我的 06</button>
+  <button id="bGame" type="button">原版 store_04</button>
+  <span class="sep" aria-hidden="true"></span>
+  <button id="bRotL" type="button">左转 90°</button>
+  <button id="bRotR" type="button">右转 90°</button>
+</nav>
+
+<div id="err" class="panel" role="alert"></div>
+
+<div id="load">
+  <div class="box">
+    <div class="t">正在拼装主街…</div>
+    <div class="bar2"><div class="fill" id="loadFill"></div></div>
+    <div class="n" id="loadN">0 / 8</div>
+  </div>
+</div>
+
+<script type="module">
+/* =====================================================================
+   零依赖装配：不使用 importmap。
+   three 与其 addons 都以动态 import 载入；addons 源码里的裸名
+   `from 'three'` 与相对路径会在运行时改写成绝对地址后，以 Blob 模块导入。
+   ===================================================================== */
+const BASE = document.baseURI;
+const THREE_URL = new URL('./libs/three.module.js', BASE).href;
+
+async function importAddon(rel){
+  const abs = new URL(rel, BASE).href;
+  const res = await fetch(abs);
+  if(!res.ok) throw new Error(rel + ' -> HTTP ' + res.status);
+  let src = await res.text();
+  src = src.replace(
+    /(from\s*|import\s*\(\s*)(['"])([^'"]+)\2/g,
+    function(m, pre, q, spec){
+      if(spec === 'three') return pre + q + THREE_URL + q;
+      if(spec.charAt(0) === '.' || spec.charAt(0) === '/') return pre + q + new URL(spec, abs).href + q;
+      return m;
+    }
+  );
+  const url = URL.createObjectURL(new Blob([src], { type:'text/javascript' }));
+  return import(url);
+}
+
+const THREE = await import('./libs/three.module.js');
+const { OrbitControls } = await importAddon('./libs/addons/controls/OrbitControls.js');
+const { GLTFLoader } = await importAddon('./libs/addons/loaders/GLTFLoader.js');
+
+/* ---------- 常量 ---------- */
+const SKY = 0xdfe9f2;
+const GAME_SCALE = 1.12;
+const TARGET_H = 9.27 * GAME_SCALE;   /* 邻栋 store_04 高 9.27 × 1.12 ≈ 10.4 */
+
+/* 邻栋：游戏 SPA 的真实位姿表 n(url, x, z, rotY, label, scale) */
+const NEIGHBOURS = [
+  { url:'models/bbq_08.glb',        x:-15, z:  8, rot:-Math.PI/2 },
+  { url:'models/shopstreet_09.glb', x:-15, z: -6, rot:-Math.PI/2 },
+  { url:'models/fishshop_02.glb',   x:-15, z:-20, rot:-Math.PI/2 },
+  { url:'models/cafe_03.glb',       x: 15, z: 30, rot: Math.PI/2 },
+  { url:'models/ramen_12.glb',      x: 15, z: 16, rot: Math.PI/2 },
+  { url:'models/residence_05.glb',  x: 15, z:  2, rot: Math.PI/2 },
+  { url:'models/office_13.glb',     x: 15, z:-12, rot: Math.PI/2 },
+];
+const SLOT = { x:-15, z:22, rot:-Math.PI/2 };
+
+const SRC = { mine:'recon_page/store_v2.glb', game:'models/store_04.glb' };
+
+/* 我的资产是"地景式"导出：剔除承托板与街景植被，只留店面 + 设备 + Gate4 街具 */
+const STRIP = /(asphalt|ground|slab|plane|palm|tree|trunk|leaf|bloss|^pole|^pot|wire|cross|^br\d)/;
+
+/* ---------- 场景（复刻游戏 mainstreet 环境） ---------- */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(SKY);
+scene.fog = new THREE.Fog(SKY, 160, 420);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 700);
+camera.position.set(0, 9, 30);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.getElementById('app').appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2, 0);
+controls.maxPolarAngle = Math.PI / 2.05;
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.update();
+
+const sun = new THREE.DirectionalLight(0xffffff, 1.9);
+sun.position.set(40, 60, 30);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -70; sun.shadow.camera.right = 70;
+sun.shadow.camera.top = 70;   sun.shadow.camera.bottom = -70;
+sun.shadow.camera.near = 1;   sun.shadow.camera.far = 260;
+sun.shadow.camera.updateProjectionMatrix();
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xcfe8ff, 0xb0a890, 1.35));
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(400, 300),
+  new THREE.MeshStandardMaterial({ color:0xb0b6ba, roughness:1 })
+);
+ground.rotation.x = -Math.PI/2;
+ground.position.y = -0.05;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ---------- 载入 ---------- */
+const loader = new GLTFLoader();
+function shade(root){
+  root.traverse(function(o){
+    if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; }
+  });
+}
+function slotGroupOf(def){
+  const g = new THREE.Group();
+  g.position.set(def.x, 0, def.z);
+  g.rotation.y = def.rot;
+  g.scale.setScalar(GAME_SCALE);
+  return g;
+}
+
+const TOTAL = 1 + NEIGHBOURS.length;
+let pending = TOTAL;
+const fillEl = document.getElementById('loadFill');
+const nEl = document.getElementById('loadN');
+function step(){
+  pending = Math.max(0, pending - 1);
+  const doneN = TOTAL - pending;
+  fillEl.style.width = Math.round(doneN / TOTAL * 100) + '%';
+  nEl.textContent = doneN + ' / ' + TOTAL;
+  if(pending === 0) document.getElementById('load').classList.add('done');
+}
+function fail(msg){
+  const e = document.getElementById('err');
+  e.textContent = '部分模型未能载入：' + msg + '（可先斜视街景，检查网络后刷新）';
+  e.classList.add('show');
+}
+
+NEIGHBOURS.forEach(function(def){
+  const holder = slotGroupOf(def);
+  scene.add(holder);
+  loader.load(def.url, function(g){
+    shade(g.scene); holder.add(g.scene); step();
+  }, undefined, function(){ fail(def.url); step(); });
+});
+
+/* ---------- 06 槽位 ---------- */
+const slot = new THREE.Group();
+slot.position.set(SLOT.x, 0, SLOT.z);
+slot.rotation.y = SLOT.rot;
+scene.add(slot);
+
+let holder = new THREE.Group();
+slot.add(holder);
+let rotNudge = 0;
+function applyNudge(){ slot.rotation.y = SLOT.rot + rotNudge; }
+
+/* 剔除承托板/植被 → 等比拟合到邻栋尺度 → 居中落地 */
+function fitAsset(root){
+  root.updateMatrixWorld(true);
+  const kill = [];
+  root.traverse(function(o){
+    if(o.isMesh && STRIP.test((o.name || '').toLowerCase())) kill.push(o);
+  });
+  kill.forEach(function(o){ if(o.parent) o.parent.remove(o); });
+
+  root.updateMatrixWorld(true);
+  let box = new THREE.Box3().setFromObject(root);
+  let size = box.getSize(new THREE.Vector3());
+  if(size.y > 0.001){
+    root.scale.multiplyScalar(TARGET_H / size.y);
+    root.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(root);
+  }
+  const c = box.getCenter(new THREE.Vector3());
+  root.position.x -= c.x;
+  root.position.z -= c.z;
+  root.position.y -= box.min.y;
+}
+
+const hudMode = document.getElementById('hudMode');
+function clearHolder(){
+  holder.traverse(function(o){ if(o.isMesh && o.geometry) o.geometry.dispose(); });
+  slot.remove(holder);
+  holder = new THREE.Group();
+  slot.add(holder);
+}
+
+function mount(mode){
+  clearHolder();
+  const url = SRC[mode] || SRC.mine;
+  loader.load(url, function(g){
+    const root = g.scene;
+    if(mode === 'mine'){
+      fitAsset(root);
+      hudMode.innerHTML = '<span class="tag">我的资产</span> store_v2.glb';
+    }else{
+      root.scale.setScalar(GAME_SCALE);
+      hudMode.innerHTML = '<span class="tag alt">游戏原版</span> store_04.glb';
+    }
+    shade(root);
+    holder.add(root);
+    step();
+    setBtn('bMine', mode === 'mine');
+    setBtn('bGame', mode === 'game');
+  }, undefined, function(){
+    fail(url);
+    hudMode.innerHTML = '<span class="tag alt">载入失败</span> ' + url;
+    step();
+  });
+}
+
+/* ---------- 视图 ---------- */
+const VIEWS = {
+  street: { pos:[0, 9, 30],      tgt:[0, 3, 0]    },
+  top:    { pos:[0, 95, 4],      tgt:[0, 0, 4]    },
+  close:  { pos:[-1.5, 6.5, 30], tgt:[-15, 4, 22] }
+};
+function setCam(v){
+  camera.position.set(v.pos[0], v.pos[1], v.pos[2]);
+  controls.target.set(v.tgt[0], v.tgt[1], v.tgt[2]);
+  controls.update();
+}
+function setBtn(id, on){ document.getElementById(id).classList.toggle('on', !!on); }
+const g = function(id){ return document.getElementById(id); };
+
+g('bStreet').addEventListener('click', function(){
+  setCam(VIEWS.street); setBtn('bStreet', 1); setBtn('bTop', 0); setBtn('bClose', 0);
+});
+g('bTop').addEventListener('click', function(){
+  setCam(VIEWS.top); setBtn('bTop', 1); setBtn('bStreet', 0); setBtn('bClose', 0);
+});
+g('bClose').addEventListener('click', function(){
+  setCam(VIEWS.close); setBtn('bClose', 1); setBtn('bStreet', 0); setBtn('bTop', 0);
+});
+g('bMine').addEventListener('click', function(){ mount('mine'); });
+g('bGame').addEventListener('click', function(){ mount('game'); });
+g('bRotL').addEventListener('click', function(){ rotNudge -= Math.PI/2; applyNudge(); });
+g('bRotR').addEventListener('click', function(){ rotNudge += Math.PI/2; applyNudge(); });
+
+addEventListener('resize', function(){
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* 看门狗：20s 收起加载层，避免白屏观感 */
+setTimeout(function(){ document.getElementById('load').classList.add('done'); }, 20000);
+
+applyNudge();
+mount('mine');
+
+(function loop(){
+  requestAnimationFrame(loop);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
