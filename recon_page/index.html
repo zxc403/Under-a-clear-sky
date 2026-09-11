@@ -136,19 +136,18 @@ const ROOT = '/Under-a-clear-sky/shots/';
 
 const MODELS = {
   store: {
-    url: './store_v2.glb',
-    title: '第一组 · MINISTOP 便利店（精修 v2）',
-    sub: '形体精修 · 羽状椰叶 / 曲面伞 / 厚度灯箱(自发光) / 玻璃门+店内货架 / 三设备分件倒角 / 暖色低角日光',
-    note: 'Blender 3.3.21 Cycles 出图同源；AO 已烘焙进顶点色，网页端与渲染图同一套光照观感',
+    url: './store.glb',
+    title: '第一组 · MINISTOP 便利店',
+    sub: '写实渲染还原 · 白瓷砖墙 / 黄蓝灯箱 / 三色条纹雨棚 / 门口三台设备',
+    note: '模型由 Blender 场景导出（Cycles 出图同源）',
     views: [
-      { id:'fig1', name:'机位 · 门头平视', pos:[1.05,1.72,12.60], tgt:[0.30,1.95,0.60], fov:33.4 },
-      { id:'fig2', name:'机位 · 设备特写', pos:[2.30,1.15,6.40],  tgt:[2.20,0.95,3.90], fov:31.9 }
+      { id:'fig1', name:'机位 1 · 平视', pos:[1.2,1.70,16.5], tgt:[0.6,2.0,2.0], fov:40.3 },
+      { id:'fig2', name:'机位 2 · 俯视', pos:[1.8,9.5,15.0],  tgt:[0.3,1.8,0],   fov:37.4 }
     ],
     flat: [
-      { label:'hero · 全采样出图', note:'shots/reconv2/hero.png', href: ROOT+'reconv2/hero.png' },
-      { label:'设备特写 · 全采样', note:'shots/reconv2/close.png', href: ROOT+'reconv2/close.png' },
-      { label:'两图对照条', note:'shots/reconv2/recon2_final.png', href: ROOT+'reconv2/reconv2_final.png' },
-      { label:'色彩管理 A/B 对照', note:'shots/reconv2/reconv2_ab.png', href: ROOT+'reconv2/reconv2_ab.png' }
+      { label:'平视原渲染图', note:'shots/reconA/fig1.png', href: ROOT+'reconA/fig1.png' },
+      { label:'俯视原渲染图', note:'shots/reconA/fig2.png', href: ROOT+'reconA/fig2.png' },
+      { label:'双机位对照条', note:'shots/reconA/montage.png', href: ROOT+'reconA/montage.png' }
     ]
   },
   sakura: {
@@ -174,7 +173,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -210,10 +209,10 @@ pmrem.compileEquirectangularShader();
   sky.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
 }
 
-const hemi = new THREE.HemisphereLight(0xbcd2ea, 0x7a6a55, 0.55);
+const hemi = new THREE.HemisphereLight(0xc6dcf2, 0x6d6457, 0.85);
 scene.add(hemi);
 
-const sun = new THREE.DirectionalLight(0xffe7c2, 2.9);
+const sun = new THREE.DirectionalLight(0xfff2df, 2.5);
 sun.position.set(-20, 28, 16);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -342,7 +341,7 @@ function load(key){
       if (o.isMesh){
         o.castShadow = true;
         o.receiveShadow = true;
-        if (o.material && 'envMapIntensity' in o.material) o.material.envMapIntensity = 0.60;
+        if (o.material && 'envMapIntensity' in o.material) o.material.envMapIntensity = 0.85;
       }
     });
     scene.add(current);
@@ -350,7 +349,7 @@ function load(key){
     const box = new THREE.Box3().setFromObject(current);
     const c = box.getCenter(new THREE.Vector3());
     sun.target.position.copy(c);
-    sun.position.set(c.x + 15.2, c.y + 24.0, c.z + 28.0);
+    sun.position.set(c.x - 20, c.y + 28, c.z + 16);
     sun.target.updateMatrixWorld();
     applyView(m.views[0], true);
     controls.autoRotate = false;
@@ -366,7 +365,7 @@ function load(key){
   }, (err) => {
     console.error(err);
     loading = false;
-    fail('模型加载失败：' + m.url + '（请确认 store_v2.glb / sakura.glb 与本页同目录，且通过 http(s) 打开）');
+    fail('模型加载失败：' + m.url + '（请确认 store.glb / sakura.glb 与本页同目录，且通过 http(s) 打开）');
   });
 }
 
