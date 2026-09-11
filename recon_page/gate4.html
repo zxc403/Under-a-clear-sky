@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Gate 4 · 06号便利店街具 · 可交互查看</title>
+<style>
+  :root{
+    --bg:#10131a; --panel:rgba(18,22,30,.82); --line:rgba(255,255,255,.12);
+    --tx:#eef2f7; --tx2:#9aa6b6; --ac:#ffd24a; --ac2:#5fb8ff;
+    --r:12px; --f:14px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;}
+  #c{position:fixed;inset:0;display:block}
+  .card{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 8px 30px rgba(0,0,0,.35)}
+  #hd{top:14px;left:14px;right:14px;padding:12px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  #hd .ttl{font-size:16px;font-weight:650;letter-spacing:.3px}
+  #hd .sub{font-size:12px;color:var(--tx2)}
+  #hd .tag{font-size:11px;color:#0c0f14;background:var(--ac);border-radius:999px;padding:3px 9px;font-weight:700}
+  #hd .sp{flex:1}
+  #hd .note{font-size:12px;color:var(--tx2);line-height:1.5}
+  #hd .note b{color:var(--ac2);font-weight:600}
+  #bar{bottom:14px;left:14px;right:14px;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  #bar button{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--tx);
+    font-size:13px;padding:9px 14px;border-radius:999px;cursor:pointer;transition:.15s;font-family:inherit}
+  #bar button:hover{background:rgba(255,255,255,.13)}
+  #bar button[aria-pressed="true"]{background:var(--ac);color:#0c0f14;border-color:var(--ac);font-weight:650}
+  #bar .sep{width:1px;height:22px;background:var(--line);margin:0 3px}
+  #bar button.ghost{opacity:.85}
+  #bar .hint{margin-left:auto;font-size:12px;color:var(--tx2);padding-right:6px}
+  #msg{top:50%;left:50%;transform:translate(-50%,-50%);max-width:min(560px,86vw);padding:18px 22px;
+    display:flex;gap:12px;align-items:flex-start;border-color:rgba(255,120,120,.5);z-index:20}
+  #msg[hidden]{display:none}
+  #msg .ic{color:#ff8a8a;font-size:18px;line-height:1.2}
+  #load{position:fixed;inset:0;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;
+    background:radial-gradient(120% 120% at 50% 40%,#1a2030,#0b0e14);z-index:30;transition:opacity .5s}
+  #load.done{opacity:0;pointer-events:none}
+  .spin{width:38px;height:38px;border:3px solid rgba(255,255,255,.15);border-top-color:var(--ac);
+    border-radius:50%;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  #ltxt{font-size:13px;color:var(--tx2)}
+  @media(max-width:720px){
+    #hd .note{display:none}
+    #bar .hint{display:none}
+    #bar button{font-size:12px;padding:8px 12px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hd" class="card">
+  <span class="tag">Gate 4</span>
+  <div>
+    <div class="ttl">06号便利店 · 街具三组</div>
+    <div class="sub">长椅花箱 / 晾衣绳 / 外挂楼梯 · 可拖动旋转 · 双指或滚轮缩放</div>
+  </div>
+  <div class="sp"></div>
+  <div class="note">
+    <b>本轮实修</b>：把烘焙 AO 接进材质 Base Color（此前烘了但没接线，画面发灰发平）。<br>
+    当前为街具单体陈列，尚未装配到店面上。
+  </div>
+</div>
+
+<div id="bar" class="card"></div>
+
+<div id="msg" class="card" hidden>
+  <span class="ic">!</span>
+  <span id="mtxt"></span>
+</div>
+
+<div id="load">
+  <div class="spin"></div>
+  <div id="ltxt">正在加载模型 …</div>
+</div>
+
+<script type="module">
+import * as THREE from './libs/three.module.js';
+import { OrbitControls } from './libs/addons/controls/OrbitControls.js';
+import { GLTFLoader } from './libs/addons/loaders/GLTFLoader.js';
+
+const cv = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 600);
+
+const controls = new OrbitControls(camera, cv);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.85;
+controls.zoomSpeed = 0.9;
+controls.minDistance = 1.2;
+controls.maxDistance = 60;
+controls.maxPolarAngle = Math.PI * 0.497;
+controls.target.set(0, 1.0, 0);
+
+// ---- environment (gradient sky -> PMREM) ----
+const pmrem = new THREE.PMREMGenerator(renderer);
+{
+  const sky = new THREE.Scene();
+  const g = new THREE.SphereGeometry(60, 32, 20);
+  const m = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { top: { value: new THREE.Color(0xbcd7f2) }, bot: { value: new THREE.Color(0x6f6a5e) } },
+    vertexShader: 'varying vec3 vp; void main(){ vp = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: 'varying vec3 vp; uniform vec3 top; uniform vec3 bot; void main(){ float h = normalize(vp).y*0.5+0.5; gl_FragColor = vec4(mix(bot, top, smoothstep(0.35,0.85,h)), 1.0); }'
+  });
+  sky.add(new THREE.Mesh(g, m));
+  scene.environment = pmrem.fromScene(sky, 0.04).texture;
+  sky.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+}
+
+const hemi = new THREE.HemisphereLight(0xc6dcf2, 0x6d6457, 0.9);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xfff2df, 2.6);
+sun.position.set(-18, 26, 15);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.02;
+const sc = sun.shadow.camera;
+sc.near = 1; sc.far = 120; sc.left = -30; sc.right = 30; sc.top = 30; sc.bottom = -30;
+scene.add(sun); scene.add(sun.target);
+
+const fill = new THREE.DirectionalLight(0xdce8ff, 0.42);
+fill.position.set(18, 12, -14);
+scene.add(fill);
+
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(80, 64),
+  new THREE.MeshStandardMaterial({ color: 0x3b4048, roughness: 1.0, metalness: 0.0 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.06;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ---- views (three.js y-up; model spans x≈-5..7, y≈0..3.2, z≈-2.6..0.5) ----
+const VIEWS = [
+  { id:'all',   name:'全景',     pos:[3.5, 5.2, 12.5], tgt:[0.8, 1.1, -1.0], fov:42 },
+  { id:'bench', name:'长椅花箱', pos:[-3.2, 1.35, 3.0], tgt:[-3.2, 0.55, -0.2], fov:48 },
+  { id:'cloth', name:'晾衣绳',   pos:[0.0, 2.35, 3.6],  tgt:[0.0, 1.95, -0.2],  fov:46 },
+  { id:'stair', name:'外挂楼梯', pos:[5.6, 1.7, 4.2],   tgt:[5.7, 1.25, -0.6],  fov:50 }
+];
+
+const elBar = document.getElementById('bar');
+const elMsg = document.getElementById('msg');
+const elMtxt = document.getElementById('mtxt');
+const elLoad = document.getElementById('load');
+const elLtxt = document.getElementById('ltxt');
+
+function fail(t){ elMsg.hidden = false; elMtxt.textContent = t; elLoad.classList.add('done'); }
+function ok(){ elMsg.hidden = true; }
+
+function applyView(v, instant){
+  camera.fov = v.fov; camera.updateProjectionMatrix();
+  const p = new THREE.Vector3().fromArray(v.pos);
+  const t = new THREE.Vector3().fromArray(v.tgt);
+  if (instant){ camera.position.copy(p); controls.target.copy(t); controls.update(); }
+  else { camera.position.lerp(p, 0.85); controls.target.lerp(t, 0.85); }
+  [...elBar.querySelectorAll('button[data-view]')].forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.view === v.id));
+  });
+}
+
+function buildBar(){
+  elBar.innerHTML = '';
+  for (const v of VIEWS){
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.view = v.id; b.textContent = v.name;
+    b.setAttribute('aria-pressed','false');
+    b.addEventListener('click', () => applyView(v, false));
+    elBar.appendChild(b);
+  }
+  const sep = document.createElement('div'); sep.className = 'sep'; elBar.appendChild(sep);
+  const home = document.createElement('button');
+  home.type = 'button'; home.className = 'ghost'; home.textContent = '复位';
+  home.addEventListener('click', () => applyView(VIEWS[0], true));
+  elBar.appendChild(home);
+  const rot = document.createElement('button');
+  rot.type = 'button'; rot.className = 'ghost'; rot.textContent = '自动旋转';
+  rot.setAttribute('aria-pressed','false');
+  rot.addEventListener('click', () => {
+    controls.autoRotate = !controls.autoRotate;
+    rot.setAttribute('aria-pressed', String(controls.autoRotate));
+  });
+  elBar.appendChild(rot);
+  const hint = document.createElement('div');
+  hint.className = 'hint'; hint.textContent = '拖动旋转 · 滚轮缩放';
+  elBar.appendChild(hint);
+}
+
+function fit(){
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+const loader = new GLTFLoader();
+let current = null;
+
+function loadModel(url){
+  elLoad.classList.remove('done');
+  elLtxt.textContent = '正在加载模型 …';
+  loader.load(url, (gltf) => {
+    ok();
+    if (current){
+      scene.remove(current);
+      current.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(x => x.dispose());
+      });
+    }
+    current = gltf.scene;
+    current.traverse(o => {
+      if (o.isMesh){
+        o.castShadow = true; o.receiveShadow = true;
+        if (o.material && 'envMapIntensity' in o.material) o.material.envMapIntensity = 0.85;
+      }
+    });
+    scene.add(current);
+    const box = new THREE.Box3().setFromObject(current);
+    const c = box.getCenter(new THREE.Vector3());
+    sun.target.position.copy(c);
+    sun.position.set(c.x - 18, c.y + 26, c.z + 15);
+    sun.target.updateMatrixWorld();
+    applyView(VIEWS[0], true);
+    controls.autoRotate = false;
+    elLoad.classList.add('done');
+  }, (ev) => {
+    if (ev && ev.total) elLtxt.textContent = '正在加载 … ' + Math.round(ev.loaded / ev.total * 100) + '%';
+  }, (err) => {
+    console.error(err);
+    fail('模型加载失败：' + url + '（请确认 gate4.glb 与本页同目录，且通过 http(s) 打开）');
+  });
+}
+
+addEventListener('resize', fit);
+addEventListener('error', (e) => { if (elMsg.hidden) fail('脚本错误：' + (e.message || 'unknown')); });
+addEventListener('unhandledrejection', (e) => {
+  if (elMsg.hidden) fail('运行错误：' + ((e.reason && e.reason.message) || e.reason));
+});
+setTimeout(() => { if (!current) fail('加载超时（20s）。若以本地文件方式打开，请改用 http(s) 访问。'); }, 20000);
+
+buildBar();
+fit();
+loadModel('./gate4.glb');
+
+(function tick(){
+  requestAnimationFrame(tick);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
