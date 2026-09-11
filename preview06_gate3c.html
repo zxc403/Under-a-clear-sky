@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>06号便利店 · 第三关修订二 · 可乐冰柜</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#bcdcf5}
+#hud{position:fixed;left:10px;top:10px;right:10px;color:#fff;
+font:12px/1.6 system-ui,-apple-system,sans-serif;
+background:rgba(12,32,56,.56);padding:9px 12px;border-radius:9px;pointer-events:none;z-index:5}
+#hud b{font-weight:600;font-size:13px}
+#hud span{opacity:.86}
+#bar{position:fixed;left:10px;right:10px;bottom:12px;display:flex;gap:8px;z-index:6}
+#bar button{flex:1;padding:10px 4px;border:0;border-radius:9px;cursor:pointer;
+font:600 13px/1 system-ui,-apple-system,sans-serif;color:#eaf2fb;
+background:rgba(16,40,68,.66);backdrop-filter:blur(6px)}
+#bar button.on{background:#e8eef6;color:#12293f}
+#msg{position:fixed;left:10px;bottom:70px;right:10px;color:#fff;
+font:12px/1.6 ui-monospace,monospace;background:rgba(122,18,18,.88);
+padding:10px 12px;border-radius:9px;display:none;white-space:pre-wrap;z-index:7}
+</style>
+</head>
+<body>
+<div id="hud"><b>06号便利店 · 第三关修订二：可乐冰柜</b><br>
+<span>红烤漆柜体 · 玻璃门 · 三层饮料（内腔自发光）· 铬把手/铰链/螺丝/万向轮 · 接地暗部<br>
+柜体 0.92m 宽 × 1.88m 高（约 6 瓶宽）· 拖动旋转 / 双指缩放</span></div>
+<div id="bar">
+  <button data-v="wide">门头全景</button>
+  <button data-v="mid">入口中景</button>
+  <button data-v="hero" class="on">冰柜特写</button>
+</div>
+<div id="msg"></div>
+
+<script>
+function err(t){var m=document.getElementById('msg');m.style.display='block';m.textContent=t;}
+window.addEventListener('error',function(e){err('✗ 脚本错误: '+(e.message||'')+'\n'+(e.filename||'')+':'+(e.lineno||''))},true);
+window.addEventListener('unhandledrejection',function(e){err('✗ 加载失败: '+((e.reason&&(e.reason.message||e.reason))||'未知'))});
+var ok=false;
+setTimeout(function(){if(!ok)err('✗ 20 秒内未启动渲染，请把这段提示截图发我。')},20000);
+</script>
+
+<script type="module">
+import * as THREE from './libs/three.module.js';
+
+/* ============================================================
+   基础工具
+   ============================================================ */
+function rand(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;
+var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;
+return((t^t>>>14)>>>0)/4294967296}}
+
+function roundedShape(w,h,r){
+  r=Math.min(r,w/2-1e-4,h/2-1e-4);
+  var s=new THREE.Shape(), x=-w/2, y=-h/2;
+  s.moveTo(x+r,y);
+  s.lineTo(x+w-r,y); s.quadraticCurveTo(x+w,y,x+w,y+r);
+  s.lineTo(x+w,y+h-r); s.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  s.lineTo(x+r,y+h); s.quadraticCurveTo(x,y+h,x,y+h-r);
+  s.lineTo(x,y+r); s.quadraticCurveTo(x,y,x+r,y);
+  return s;
+}
+/* 真倒角方块：外形精确 w×h×d，圆角 r，倒角量 b */
+function bevelBox(w,h,d,r,b,cs){
+  b=(b===undefined)?0.005:b; r=(r===undefined)?0.02:r; cs=cs||6;
+  var sh=roundedShape(Math.max(w-2*b,0.002),Math.max(h-2*b,0.002),Math.max(r-b,0.0008));
+  var g=new THREE.ExtrudeGeometry(sh,{depth:Math.max(d-2*b,0.002),bevelEnabled:true,
+    bevelThickness:b,bevelSize:b,bevelSegments:3,curveSegments:cs,steps:1});
+  g.center(); return g;
+}
+function rod(a,b,r,mat,seg){
+  var dir=new THREE.Vector3().subVectors(b,a), len=dir.length();
+  var m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,seg||12),mat);
+  m.position.copy(a).addScaledVector(dir,0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.clone().normalize());
+  m.castShadow=true; return m;
+}
+/* 由宽高与画幅比例求解相机距离：保证主体完整入画（不靠试错） */
+function fitDist(halfW,halfH,halfD,aspect,fovYr,pad){
+  var fovX=2*Math.atan(Math.tan(fovYr/2)*aspect);
+  var dv=halfH/Math.tan(fovYr/2);
+  var dh=halfW/Math.tan(fovX/2);
+  return Math.max(dv,dh)*(pad||1.08)+halfD*0.7;
+}
+
+/* ============================================================
+   贴图（全部确定性绘制）
+   ============================================================ */
+function makeTileTexture(px){
+  var TILES=16, GROUT='#D6D2CA', T=[242,240,234];
+  var c=document.createElement('canvas'); c.width=c.height=px;
+  var g=c.getContext('2d');
+  var step=px/TILES, grout=Math.max(1.6,px/900);
+  g.fillStyle=GROUT; g.fillRect(0,0,px,px);
+  var rnd=rand(20260910);
+  for(var rr=0;rr<TILES;rr++)for(var q=0;q<TILES;q++){
+    var j=Math.round((rnd()-0.5)*4);
+    g.fillStyle='rgb('+(T[0]+j)+','+(T[1]+j)+','+(T[2]+j)+')';
+    var x0=q*step+grout/2, y0=rr*step+grout/2, w=step-grout, h=step-grout;
+    g.fillRect(x0,y0,w,h);
+    g.strokeStyle='rgba(255,255,255,0.55)'; g.lineWidth=Math.max(1,px/1400);
+    g.beginPath(); g.moveTo(x0,y0+h); g.lineTo(x0,y0); g.lineTo(x0+w,y0); g.stroke();
+    g.strokeStyle='rgba(176,170,158,0.40)';
+    g.beginPath(); g.moveTo(x0+w,y0); g.lineTo(x0+w,y0+h); g.lineTo(x0,y0+h); g.stroke();
+    g.fillStyle='rgba(255,255,255,0.06)';
+    g.fillRect(x0+w*0.18,y0+h*0.18,w*0.64,h*0.64);
+  }
+  var t=new THREE.CanvasTexture(c);
+  t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8;
+  return t;
+}
+function makeSignTexture(w,h){
+  var c=document.createElement('canvas'); c.width=w; c.height=h;
+  var g=c.getContext('2d');
+  var CU='#0B4EA2', YE='#FFD200', WH='#FBF9F4';
+  g.fillStyle=WH; g.fillRect(0,0,w,h);
+  g.strokeStyle=CU; g.lineWidth=Math.round(h*0.055);
+  g.strokeRect(g.lineWidth/2,g.lineWidth/2,w-g.lineWidth,h-g.lineWidth);
+  var blueH=Math.round(h*0.155); g.fillStyle=CU; g.fillRect(0,0,w,blueH);
+  var yelH=Math.round(h*0.235); g.fillStyle=YE; g.fillRect(0,h-yelH,w,yelH);
+  g.fillStyle=CU; g.fillRect(0,h-yelH-Math.round(h*0.02),w,Math.round(h*0.02));
+  var midY=h*0.5, fs=Math.round(h*0.40);
+  g.font='900 '+fs+'px "Arial Black",Arial,sans-serif';
+  g.textAlign='center'; g.textBaseline='middle';
+  var word='MINISTOP', gap=fs*0.055, widths=[], total=0, i;
+  for(i=0;i<word.length;i++){var ww=g.measureText(word[i]).width; widths.push(ww); total+=ww+gap;}
+  total-=gap; var cx=w/2-total/2;
+  g.fillStyle=CU;
+  for(i=0;i<word.length;i++){ g.fillText(word[i],cx+widths[i]/2,midY); cx+=widths[i]+gap; }
+  g.textAlign='left'; g.font='700 '+Math.round(h*0.13)+'px Arial,sans-serif'; g.fillStyle=CU;
+  g.fillText('24H', Math.round(w*0.05), h-yelH/2);
+  g.textAlign='right'; g.fillStyle='#E9E6DE';
+  g.fillText('CONVENIENCE', w-Math.round(w*0.04), blueH/2);
+  var t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
+}
+function makeStripeTexture(px,stripes){
+  var c=document.createElement('canvas'); c.width=px; c.height=64;
+  var g=c.getContext('2d');
+  var sw=px/stripes, i, y;
+  for(i=0;i<stripes;i++){ g.fillStyle=(i%2===0)?'#D8232A':'#F5F3EE'; g.fillRect(i*sw,0,sw+1,64); }
+  g.globalAlpha=0.05; g.fillStyle='#000';
+  for(y=2;y<64;y+=4) g.fillRect(0,y,px,1);
+  g.globalAlpha=1;
+  var t=new THREE.CanvasTexture(c);
+  t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; return t;
+}
+/* 柜顶品牌灯箱：红底白字（与店招同色系） */
+function makeBrandStrip(w,h){
+  var c=document.createElement('canvas'); c.width=w; c.height=h;
+  var g=c.getContext('2d');
+  g.fillStyle='#CE1B24'; g.fillRect(0,0,w,h);
+  g.fillStyle='rgba(255,255,255,0.10)'; g.fillRect(0,0,w,Math.round(h*0.22));
+  g.fillStyle='#FFFFFF';
+  g.font='900 '+Math.round(h*0.46)+'px "Arial Black",Arial,sans-serif';
+  g.textAlign='center'; g.textBaseline='middle';
+  g.fillText('MINISTOP', w*0.5, h*0.53);
+  var t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
+}
+/* 店内景（透过橱窗看到，暖光 + 货架剪影），避免玻璃读成黑洞 */
+function makeShopInteriorTex(w,h){
+  var c=document.createElement('canvas'); c.width=w; c.height=h;
+  var g=c.getContext('2d');
+  var grd=g.createLinearGradient(0,0,0,h);
+  grd.addColorStop(0,'#FBF0DA'); grd.addColorStop(0.5,'#F0E0C4'); grd.addColorStop(1,'#CDB894');
+  g.fillStyle=grd; g.fillRect(0,0,w,h);
+  g.fillStyle='rgba(255,255,255,0.75)'; g.fillRect(0,0,w,Math.round(h*0.05));
+  var rows=3, rnd=rand(9911), r, q;
+  for(r=1;r<=rows;r++){
+    var y=h*0.20+r*(h*0.24);
+    g.fillStyle='rgba(150,130,104,0.55)';
+    g.fillRect(0,y,w,Math.max(2,Math.round(h*0.012)));
+    for(q=0;q<9;q++){
+      var bw=w/9*0.52, bx=q*(w/9)+w/9*0.24, bh=h*0.17;
+      var pal=['#C9A227','#8C3B3B','#3F6C8F','#5C7A4A','#B9773C'];
+      g.fillStyle=pal[Math.floor(rnd()*pal.length)];
+      g.globalAlpha=0.62; g.fillRect(bx,y-bh,bw,bh); g.globalAlpha=1;
+    }
+  }
+  var t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=4; return t;
+}
+function makeShadowTex(){
+  var px=256, c=document.createElement('canvas'); c.width=c.height=px;
+  var g=c.getContext('2d');
+  var gr=g.createRadialGradient(px/2,px/2,0,px/2,px/2,px/2);
+  gr.addColorStop(0,'rgba(22,20,18,0.70)');
+  gr.addColorStop(0.42,'rgba(22,20,18,0.32)');
+  gr.addColorStop(0.76,'rgba(22,20,18,0.08)');
+  gr.addColorStop(1,'rgba(22,20,18,0)');
+  g.fillStyle=gr; g.fillRect(0,0,px,px);
+  var t=new THREE.CanvasTexture(c); t.anisotropy=4; return t;
+}
+function makeFloorTex(px){
+  var c=document.createElement('canvas'); c.width=c.height=px;
+  var g=c.getContext('2d');
+  g.fillStyle='#B4AFA5'; g.fillRect(0,0,px,px);
+  var r=rand(4242), i;
+  for(i=0;i<150;i++){
+    var x=r()*px, y=r()*px, rad=(0.012+r()*0.055)*px, a=0.02+r()*0.05;
+    var gr=g.createRadialGradient(x,y,0,x,y,rad);
+    gr.addColorStop(0, r()>0.5?('rgba(88,84,78,'+a+')'):('rgba(255,255,255,'+a+')'));
+    gr.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=gr; g.beginPath(); g.arc(x,y,rad,0,7); g.fill();
+  }
+  var t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
+}
+function makeEnvTexture(){
+  var c=document.createElement('canvas'); c.width=1024; c.height=512;
+  var g=c.getContext('2d');
+  var grd=g.createLinearGradient(0,0,0,512);
+  grd.addColorStop(0,'#6FA8DC'); grd.addColorStop(0.42,'#D6E8F7');
+  grd.addColorStop(0.52,'#EFEDE7'); grd.addColorStop(1,'#7E796D');
+  g.fillStyle=grd; g.fillRect(0,0,1024,512);
+  var s=g.createRadialGradient(300,110,8,300,110,230);
+  s.addColorStop(0,'rgba(255,255,255,1)'); s.addColorStop(0.22,'rgba(255,250,236,0.8)');
+  s.addColorStop(1,'rgba(255,250,236,0)');
+  g.fillStyle=s; g.fillRect(0,0,1024,512);
+  g.fillStyle='rgba(150,145,136,0.30)'; g.fillRect(0,372,1024,140);
+  var t=new THREE.CanvasTexture(c);
+  t.mapping=THREE.EquirectangularReflectionMapping; t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+
+/* ============================================================
+   轻量轨道控制（单指旋转 / 双指缩放平移 / 滚轮）
+   ============================================================ */
+class Orbit{
+  constructor(camera,dom,target,opt){
+    opt=opt||{};
+    this.camera=camera; this.dom=dom;
+    this.target=target.clone(); this.tTarget=target.clone();
+    this.minDistance=opt.minDistance!==undefined?opt.minDistance:0.5;
+    this.maxDistance=opt.maxDistance!==undefined?opt.maxDistance:22;
+    this.maxPolarAngle=opt.maxPolarAngle!==undefined?opt.maxPolarAngle:Math.PI*0.495;
+    this.damping=opt.damping!==undefined?opt.damping:0.14;
+    var off=new THREE.Vector3().subVectors(camera.position,this.target);
+    this.sph=new THREE.Spherical().setFromVector3(off);
+    this.tSph=this.sph.clone();
+    this._ptrs=new Map(); this._last=null; this._lastMid=null; this._lastDist=0;
+    dom.style.touchAction='none';
+    var self=this;
+    dom.addEventListener('pointerdown',function(e){self._down(e)});
+    dom.addEventListener('pointermove',function(e){self._move(e)});
+    dom.addEventListener('pointerup',function(e){self._up(e)});
+    dom.addEventListener('pointercancel',function(e){self._up(e)});
+    dom.addEventListener('wheel',function(e){
+      e.preventDefault();
+      self.tSph.radius=THREE.MathUtils.clamp(self.tSph.radius*Math.pow(0.999,e.deltaY),
+        self.minDistance,self.maxDistance);
+    },{passive:false});
+  }
+  setView(pos,target){
+    this.target.copy(target); this.tTarget.copy(target);
+    var off=new THREE.Vector3().subVectors(pos,target);
+    this.sph.setFromVector3(off); this.tSph.copy(this.sph);
+  }
+  _down(e){
+    if(this.dom.setPointerCapture){try{this.dom.setPointerCapture(e.pointerId)}catch(_){}}
+    this._ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); this._sync();
+  }
+  _up(e){ this._ptrs.delete(e.pointerId); this._sync(); }
+  _sync(){
+    var n=this._ptrs.size;
+    if(n===1){
+      var p=Array.from(this._ptrs.values())[0];
+      this._last={x:p.x,y:p.y}; this._lastMid=null; this._lastDist=0;
+    }else if(n>=2){
+      var a=Array.from(this._ptrs.values());
+      this._lastMid={x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2};
+      this._lastDist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y); this._last=null;
+    }else{ this._last=null; this._lastMid=null; this._lastDist=0; }
+  }
+  _move(e){
+    if(!this._ptrs.has(e.pointerId)) return;
+    this._ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    var a=Array.from(this._ptrs.values());
+    if(a.length>=2){
+      var mid={x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2};
+      var dist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+      if(this._lastDist>0&&dist>0){
+        this.tSph.radius=THREE.MathUtils.clamp(this.tSph.radius*this._lastDist/dist,
+          this.minDistance,this.maxDistance);
+      }
+      if(this._lastMid) this._pan(mid.x-this._lastMid.x, mid.y-this._lastMid.y);
+      this._lastMid=mid; this._lastDist=dist;
+    }else if(a.length===1&&this._last){
+      var dx=a[0].x-this._last.x, dy=a[0].y-this._last.y;
+      this.tSph.theta-=dx*0.005;
+      this.tSph.phi=THREE.MathUtils.clamp(this.tSph.phi-dy*0.005,0.06,this.maxPolarAngle);
+      this._last={x:a[0].x,y:a[0].y};
+    }
+  }
+  _pan(dx,dy){
+    var h=this.dom.clientHeight||1;
+    var scale=this.tSph.radius*Math.tan((this.camera.fov*Math.PI/180)/2)*2/h;
+    var right=new THREE.Vector3().setFromMatrixColumn(this.camera.matrix,0);
+    var up=new THREE.Vector3().setFromMatrixColumn(this.camera.matrix,1);
+    this.tTarget.addScaledVector(right,-dx*scale);
+    this.tTarget.addScaledVector(up,dy*scale);
+  }
+  update(){
+    var k=this.damping;
+    this.sph.theta+=(this.tSph.theta-this.sph.theta)*k;
+    this.sph.phi+=(this.tSph.phi-this.sph.phi)*k;
+    this.sph.radius+=(this.tSph.radius-this.sph.radius)*k;
+    this.sph.makeSafe();
+    this.target.lerp(this.tTarget,k);
+    this.camera.position.copy(this.target).add(new THREE.Vector3().setFromSpherical(this.sph));
+    this.camera.lookAt(this.target);
+  }
+}
+
+/* ============================================================
+   场景
+   ============================================================ */
+try{
+  var renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.04;
+  renderer.outputColorSpace=THREE.SRGBColorSpace;
+  document.body.appendChild(renderer.domElement);
+
+  var scene=new THREE.Scene();
+  var pmrem=new THREE.PMREMGenerator(renderer);
+  scene.environment=pmrem.fromEquirectangular(makeEnvTexture()).texture;
+
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(400,32,16),
+    new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,
+      uniforms:{top:{value:new THREE.Color(0x5FA8E8)},bottom:{value:new THREE.Color(0xDCEDFB)}},
+      vertexShader:'varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader:'varying vec3 vP;uniform vec3 top;uniform vec3 bottom;void main(){float k=clamp((normalize(vP).y*0.5+0.5),0.0,1.0);gl_FragColor=vec4(mix(bottom,top,pow(k,0.75)),1.0);}'})
+  ));
+
+  scene.add(new THREE.HemisphereLight(0xDCEDFB,0xA79E90,0.85));
+  var sun=new THREE.DirectionalLight(0xFFF3E2,2.7);
+  sun.position.set(-5.5,8.5,6.5);
+  sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.camera.near=0.5; sun.shadow.camera.far=30;
+  sun.shadow.camera.left=-5.5; sun.shadow.camera.right=5.5;
+  sun.shadow.camera.top=5.5; sun.shadow.camera.bottom=-1.5;
+  sun.shadow.bias=-0.00035; sun.shadow.normalBias=0.02;
+  scene.add(sun);
+  var fill=new THREE.DirectionalLight(0xC6DAEC,0.5); fill.position.set(7,3.4,5); scene.add(fill);
+  var rim=new THREE.DirectionalLight(0xFFFFFF,0.6); rim.position.set(-2,3.6,-7); scene.add(rim);
+
+  var floorTex=makeFloorTex(512); floorTex.repeat.set(6,6);
+  var ground=new THREE.Mesh(new THREE.PlaneGeometry(70,70),
+    new THREE.MeshStandardMaterial({map:floorTex,color:0xB4AFA5,roughness:0.94,metalness:0}));
+  ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+
+  /* ================= 墙体与店头 ================= */
+  var WALL_W=6.0, WALL_H=4.2, WALL_T=0.24, Z0=WALL_T/2, TILE_SPAN=2.4;
+  var tileTex=makeTileTexture(1024);
+  tileTex.repeat.set(WALL_W/TILE_SPAN, WALL_H/TILE_SPAN);
+  var tileMat=new THREE.MeshStandardMaterial({map:tileTex,roughness:0.42,metalness:0,envMapIntensity:0.35});
+  var sideMat=new THREE.MeshStandardMaterial({color:0xE7E2D9,roughness:0.9});
+  var wall=new THREE.Mesh(new THREE.BoxGeometry(WALL_W,WALL_H,WALL_T),
+    [sideMat,sideMat,sideMat,sideMat,tileMat,sideMat]);
+  wall.position.set(0,WALL_H/2,0); wall.castShadow=true; wall.receiveShadow=true; scene.add(wall);
+
+  var plinth=new THREE.Mesh(bevelBox(WALL_W+0.06,0.10,WALL_T+0.05,0.008,0.003),
+    new THREE.MeshStandardMaterial({color:0xCFCAC0,roughness:0.8}));
+  plinth.position.set(0,0.05,0.005); plinth.castShadow=true; plinth.receiveShadow=true; scene.add(plinth);
+
+  var mGloss=new THREE.MeshPhysicalMaterial({color:0xEFF6FA,roughness:0.05,metalness:0.0,
+    transparent:true,opacity:0.20,envMapIntensity:1.6,side:THREE.DoubleSide});
+  var mFrame=new THREE.MeshStandardMaterial({color:0xD3CEC4,roughness:0.42,metalness:0.38,envMapIntensity:0.9});
+  var interiorTex=makeShopInteriorTex(1024,700);
+  var mInterior=new THREE.MeshStandardMaterial({map:interiorTex,emissive:0xffffff,
+    emissiveMap:interiorTex,emissiveIntensity:0.34,roughness:0.9});
+
+  /* 橱窗（居中 -0.15，宽 1.90，高 2.05） */
+  var winW=1.90, winH=2.05, winCX=-0.15, winCY=1.15;
+  var winBack=new THREE.Mesh(new THREE.PlaneGeometry(winW-0.10,winH-0.10),mInterior);
+  winBack.position.set(winCX,winCY,Z0-0.14); scene.add(winBack);
+  var win=new THREE.Mesh(new THREE.PlaneGeometry(winW,winH),mGloss);
+  win.position.set(winCX,winCY,Z0+0.03); scene.add(win);
+  scene.add((function(){var m=new THREE.Mesh(bevelBox(winW+0.12,winH+0.12,0.05,0.008,0.003),mFrame);
+    m.position.set(winCX,winCY,Z0-0.005); m.castShadow=true; return m;})());
+  scene.add((function(){var m=new THREE.Mesh(bevelBox(0.035,winH,0.03,0.005,0.002),mFrame);
+    m.position.set(winCX-0.32,winCY,Z0+0.03); return m;})());
+  scene.add((function(){var m=new THREE.Mesh(bevelBox(0.035,winH,0.03,0.005,0.002),mFrame);
+    m.position.set(winCX+0.32,winCY,Z0+0.03); return m;})());
+  scene.add((function(){var m=new THREE.Mesh(bevelBox(winW,0.03,0.03,0.005,0.002),mFrame);
+    m.position.set(winCX,winCY+0.10,Z0+0.03); return m;})());
+  scene.add((function(){var m=new THREE.Mesh(bevelBox(winW+0.16,0.05,0.30,0.008,0.003),mFrame);
+    m.position.set(winCX,winCY+winH/2+0.075,Z0+0.05); m.castShadow=true; return m;})());
+
+  /* 玻璃门（居中 1.55，宽 1.25，高 2.15） */
+  var doorW=1.25, doorH=2.15, doorCX=1.55, doorCY=1.08;
+  var doorBack=new THREE.Mesh(new THREE.PlaneGeometry(doorW-0.10,doorH-0.10),mInterior);
+  doorBack.position.set(doorCX,doorCY,Z0-0.14); scene.add(doorBack);
+  var dr=new THREE.Mesh(new THREE.PlaneGeometry(doorW,doorH),mGloss);
+  dr.position.set(doorCX,doorCY,Z0+0.03); scene.add(dr);
+  scene.add((function(){var m=new THREE.Mesh(bevelBox(doorW+0.14,doorH+0.12,0.06,0.008,0.003),mFrame);
+    m.position.set(doorCX,doorCY,Z0-0.005); m.castShadow=true; return m;})());
+  scene.add((function(){var m=new THREE.Mesh(bevelBox(doorW,0.045,0.03,0.005,0.002),mFrame);
+    m.position.set(doorCX,doorCY+0.85,Z0+0.035); return m;})());
+  scene.add((function(){var m=new THREE.Mesh(bevelBox(doorW,0.045,0.03,0.005,0.002),mFrame);
+    m.position.set(doorCX,doorCY-0.90,Z0+0.035); return m;})());
+  var pushBar=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.016,0.86,14),
+    new THREE.MeshStandardMaterial({color:0xC8CDD2,roughness:0.22,metalness:1.0,envMapIntensity:1.4}));
+  pushBar.position.set(doorCX-0.44,doorCY,Z0+0.085); scene.add(pushBar);
+  [1,-1].forEach(function(s){ scene.add(rod(
+    new THREE.Vector3(doorCX-0.44,doorCY+s*0.30,Z0+0.045),
+    new THREE.Vector3(doorCX-0.44,doorCY+s*0.30,Z0+0.082),0.010,mFrame,10)); });
+  /* 门口台阶 */
+  var step=new THREE.Mesh(bevelBox(1.75,0.10,0.62,0.010,0.004),
+    new THREE.MeshStandardMaterial({color:0xB9B4A9,roughness:0.9}));
+  step.position.set(doorCX,0.05,Z0+0.32); step.castShadow=true; step.receiveShadow=true; scene.add(step);
+
+  /* 门楣横梁 2.18~2.48 */
+  var header=new THREE.Mesh(bevelBox(3.60,0.30,WALL_T+0.08,0.010,0.004),sideMat);
+  header.position.set(0.54,2.33,0); header.castShadow=true; header.receiveShadow=true; scene.add(header);
+
+  /* 招牌 2.585~3.535，居中 0.54 */
+  var SIGN_W=4.20, SIGN_H=0.95, SIGN_T=0.18, signCY=3.06, signCX=0.54;
+  var signZ=Z0+SIGN_T/2+0.02;
+  var signTex=makeSignTexture(2048,Math.round(2048*SIGN_H/SIGN_W));
+  var signFace=new THREE.MeshStandardMaterial({map:signTex,emissive:0xffffff,emissiveMap:signTex,
+    emissiveIntensity:0.32,roughness:0.5});
+  var signBody=new THREE.MeshStandardMaterial({color:0xE9E6DE,roughness:0.65});
+  var sign=new THREE.Mesh(new THREE.BoxGeometry(SIGN_W,SIGN_H,SIGN_T),
+    [signBody,signBody,signBody,signBody,signFace,signBody]);
+  sign.position.set(signCX,signCY,signZ); sign.castShadow=true; sign.receiveShadow=true; scene.add(sign);
+  var mBrace=new THREE.MeshStandardMaterial({color:0x9AA0A6,roughness:0.5,metalness:0.6});
+  [-1,1].forEach(function(s){
+    scene.add(rod(new THREE.Vector3(signCX+s*(SIGN_W/2-0.18),signCY-0.34,Z0+0.01),
+                  new THREE.Vector3(signCX+s*(SIGN_W/2-0.18),signCY-0.06,signZ+SIGN_T/2-0.02),
+                  0.026,mBrace,10));
+  });
+
+  /* 雨棚：接墙 y=2.48，前缘约 2.25，居中 0.54，宽 4.4 */
+  var AWN_W=4.40, AWN_D=1.15, AWN_TOP=2.48, TILT=0.20, AWN_CX=0.54;
+  var awning=new THREE.Group();
+  awning.position.set(AWN_CX,AWN_TOP,Z0); awning.rotation.x=TILT; scene.add(awning);
+  var mStripe=new THREE.MeshStandardMaterial({map:makeStripeTexture(2048,26),roughness:0.82,side:THREE.DoubleSide});
+  var mUnder=new THREE.MeshStandardMaterial({color:0x8E2A28,roughness:0.9,side:THREE.DoubleSide});
+  var canopy=new THREE.Mesh(new THREE.BoxGeometry(AWN_W,0.04,AWN_D),
+    [mStripe,mStripe,mStripe,mUnder,mStripe,mStripe]);
+  canopy.position.set(0,0,AWN_D/2); canopy.castShadow=true; canopy.receiveShadow=true; awning.add(canopy);
+  var valH=0.30, valTex=makeStripeTexture(2048,26); valTex.repeat.set(AWN_W/0.9,1);
+  var mVal=new THREE.MeshStandardMaterial({map:valTex,roughness:0.82,side:THREE.DoubleSide});
+  var valGroup=new THREE.Group();
+  valGroup.position.set(0,-AWN_D*Math.sin(TILT),AWN_D*Math.cos(TILT));
+  valGroup.rotation.x=-TILT; awning.add(valGroup);
+  var valance=new THREE.Mesh(new THREE.BoxGeometry(AWN_W,valH,0.028),
+    [mVal,mVal,mVal,mVal,mVal,mVal]);
+  valance.position.set(0,-valH/2-0.015,0); valance.castShadow=true; valGroup.add(valance);
+  /* 灯泡串：一道细绳 + 13 颗灯 */
+  var cord=new THREE.Mesh(bevelBox(AWN_W-0.10,0.010,0.010,0.004,0.001),
+    new THREE.MeshStandardMaterial({color:0x3B3B3B,roughness:0.85}));
+  cord.position.set(0,-valH-0.055,0.012); valGroup.add(cord);
+  var mBulb=new THREE.MeshStandardMaterial({color:0xFFF3C8,emissive:0xFFE9A0,emissiveIntensity:1.6,roughness:0.28});
+  for(var bi=0;bi<13;bi++){
+    var bx=-AWN_W/2+0.30+bi*((AWN_W-0.60)/12);
+    var bl=new THREE.Mesh(new THREE.SphereGeometry(0.034,14,12),mBulb);
+    bl.position.set(bx,-valH-0.092,0.014); valGroup.add(bl);
+  }
+  var mStrut=new THREE.MeshStandardMaterial({color:0xB8BCC0,roughness:0.45,metalness:0.65});
+  [-1,1].forEach(function(s){
+    var sx=AWN_CX+s*(AWN_W/2-0.18);
+    scene.add(rod(new THREE.Vector3(sx,AWN_TOP-0.74,Z0+0.02),
+                  new THREE.Vector3(sx,AWN_TOP-AWN_D*Math.sin(TILT)-0.03,Z0+AWN_D*Math.cos(TILT)-0.05),
+                  0.026,mStrut,10));
+  });
+
+  /* ============================================================
+     可乐冰柜：x=-2.45，柜体 0.92×0.70×1.88
+     ============================================================ */
+  var FR_W=0.92, FR_D=0.70, FR_H=1.88, FR_X=-2.45, FR_Z=Z0+FR_D/2+0.12;
+  var fridge=new THREE.Group();
+  fridge.position.set(FR_X,0,FR_Z); scene.add(fridge);
+
+  var mRed=new THREE.MeshPhysicalMaterial({color:0xCB1B24,roughness:0.32,metalness:0.06,
+    clearcoat:0.7,clearcoatRoughness:0.20,envMapIntensity:1.0});
+  var mRedDim=new THREE.MeshPhysicalMaterial({color:0xB01720,roughness:0.40,metalness:0.06,
+    clearcoat:0.5,clearcoatRoughness:0.30,envMapIntensity:0.9});
+  var mTrimW=new THREE.MeshStandardMaterial({color:0xEFEDE8,roughness:0.45,metalness:0.04,envMapIntensity:0.7});
+  var mChrome=new THREE.MeshStandardMaterial({color:0xDCDFE3,roughness:0.15,metalness:1.0,envMapIntensity:1.6});
+  var mAlu=new THREE.MeshStandardMaterial({color:0xC2C7CC,roughness:0.30,metalness:0.85,envMapIntensity:1.3});
+  var mDark=new THREE.MeshStandardMaterial({color:0x24282D,roughness:0.66,metalness:0.15,envMapIntensity:0.6});
+  var mRubber=new THREE.MeshStandardMaterial({color:0x1B1B1D,roughness:0.95,metalness:0});
+  /* 内衬：自发光，保证腔内永远可见（不依赖外部光照） */
+  var mLiner=new THREE.MeshStandardMaterial({color:0xF4F2EC,emissive:0xFFFDF4,
+    emissiveIntensity:0.34,roughness:0.62,metalness:0.02});
+  var mShelf=new THREE.MeshStandardMaterial({color:0xCBD0D5,roughness:0.34,metalness:0.6,envMapIntensity:1.1});
+  var mGlass=new THREE.MeshPhysicalMaterial({color:0xFFFFFF,roughness:0.02,metalness:0,
+    transparent:true,opacity:0.10,envMapIntensity:1.8,side:THREE.DoubleSide});
+
+  var WALLT=0.030, sideX=FR_W/2-WALLT/2, BOT=0.11, TOPY=FR_H, ZH=FR_D/2;
+  var inH=TOPY-BOT;
+
+  /* 侧板 / 顶板 / 底板 / 背板 */
+  [-1,1].forEach(function(s){
+    var p=new THREE.Mesh(bevelBox(WALLT,inH,FR_D,0.014,0.004),mRed);
+    p.position.set(s*sideX,(BOT+TOPY)/2,0); p.castShadow=true; p.receiveShadow=true; fridge.add(p);
+  });
+  var topP=new THREE.Mesh(bevelBox(FR_W,WALLT,FR_D,0.014,0.004),mRed);
+  topP.position.set(0,TOPY-WALLT/2,0); topP.castShadow=true; topP.receiveShadow=true; fridge.add(topP);
+  var botP=new THREE.Mesh(bevelBox(FR_W,WALLT,FR_D,0.014,0.004),mRedDim);
+  botP.position.set(0,BOT+WALLT/2,0); botP.castShadow=true; botP.receiveShadow=true; fridge.add(botP);
+  var backP=new THREE.Mesh(bevelBox(FR_W,inH,WALLT,0.014,0.004),mRedDim);
+  backP.position.set(0,(BOT+TOPY)/2,-ZH+WALLT/2); backP.castShadow=true; fridge.add(backP);
+
+  /* 内衬 + 内顶灯 */
+  var linerW=FR_W-2*WALLT, linerH=inH-2*WALLT;
+  var linBack=new THREE.Mesh(bevelBox(linerW,linerH,0.020,0.008,0.003),mLiner);
+  linBack.position.set(0,(BOT+TOPY)/2,-ZH+WALLT+0.012); fridge.add(linBack);
+  var linTop=new THREE.Mesh(bevelBox(linerW,0.020,0.30,0.008,0.003),mLiner);
+  linTop.position.set(0,TOPY-WALLT-0.012,ZH-0.17); fridge.add(linTop);
+  [-1,1].forEach(function(s){
+    var l=new THREE.Mesh(bevelBox(0.020,linerH,0.30,0.008,0.003),mLiner);
+    l.position.set(s*(linerW/2-0.012),(BOT+TOPY)/2,ZH-0.17); fridge.add(l);
+  });
+  var topLight=new THREE.Mesh(bevelBox(linerW-0.07,0.016,0.09,0.006,0.002),
+    new THREE.MeshStandardMaterial({color:0xF7F9FB,emissive:0xEAF2FF,emissiveIntensity:1.8,roughness:0.4}));
+  topLight.position.set(0,TOPY-WALLT-0.105,ZH-0.145); fridge.add(topLight);
+  /* 腔内补光（让瓶体有立体明暗） */
+  var p1=new THREE.PointLight(0xEFF6FF,1.1,2.2,2.0); p1.position.set(0,1.58,ZH-0.26); fridge.add(p1);
+  var p2=new THREE.PointLight(0xFFF3E0,0.7,1.8,2.0); p2.position.set(0,0.80,ZH-0.28); fridge.add(p2);
+
+  /* 三层货架 + 饮料瓶 */
+  var shelfYs=[0.44,0.86,1.28];
+  var pal=[0xD8232A,0x1B5FA8,0xF0C419,0x2E8B57,0xE86A17,0xF2F0EA,0x7B3FA0,0x0FA3A3];
+  shelfYs.forEach(function(sy,si){
+    var shelf=new THREE.Mesh(bevelBox(linerW-0.02,0.012,0.28,0.006,0.002),mShelf);
+    shelf.position.set(0,sy,ZH-0.17); shelf.castShadow=true; shelf.receiveShadow=true; fridge.add(shelf);
+    var rail=new THREE.Mesh(bevelBox(linerW-0.02,0.021,0.010,0.004,0.002),mAlu);
+    rail.position.set(0,sy+0.014,ZH-0.305); fridge.add(rail);
+    for(var q=0;q<5;q++){
+      var bx=-(linerW/2-0.075)+q*((linerW-0.15)/4);
+      var col=pal[(si*5+q)%pal.length];
+      var mB=new THREE.MeshStandardMaterial({color:col,roughness:0.24,metalness:0.05,
+        emissive:col,emissiveIntensity:0.10,envMapIntensity:1.1});
+      var body=new THREE.Mesh(new THREE.CylinderGeometry(0.030,0.031,0.155,16),mB);
+      body.position.set(bx,sy+0.006+0.0775,ZH-0.195); body.castShadow=true; fridge.add(body);
+      var lab=new THREE.Mesh(new THREE.CylinderGeometry(0.0318,0.0318,0.060,16),
+        new THREE.MeshStandardMaterial({color:0xF6F4EF,roughness:0.42,emissive:0xF6F4EF,emissiveIntensity:0.10}));
+      lab.position.copy(body.position); fridge.add(lab);
+      var cap=new THREE.Mesh(new THREE.CylinderGeometry(0.017,0.019,0.018,14),mChrome);
+      cap.position.set(bx,sy+0.006+0.163,ZH-0.195); fridge.add(cap);
+    }
+  });
+
+  /* 前框四边 */
+  var frameT=0.055;
+  var fT=new THREE.Mesh(bevelBox(FR_W,frameT,WALLT+0.012,0.010,0.004),mRed);
+  fT.position.set(0,TOPY-WALLT-frameT/2,ZH-WALLT/2); fridge.add(fT);
+  var fB=new THREE.Mesh(bevelBox(FR_W,frameT,WALLT+0.012,0.010,0.004),mRed);
+  fB.position.set(0,BOT+WALLT+frameT/2,ZH-WALLT/2); fridge.add(fB);
+  [-1,1].forEach(function(s){
+    var f=new THREE.Mesh(bevelBox(frameT,inH,WALLT+0.012,0.010,0.004),mRed);
+    f.position.set(s*(FR_W/2-frameT/2),(BOT+TOPY)/2,ZH-WALLT/2); fridge.add(f);
+  });
+
+  /* 玻璃门总成 */
+  var doorG=new THREE.Group(); fridge.add(doorG);
+  var dW=FR_W-0.06, dH=inH-0.03, dY=(BOT+TOPY)/2, dZ=ZH+0.012, bar=0.045;
+  var frT=new THREE.Mesh(bevelBox(dW,bar,0.036,0.010,0.003),mAlu);
+  frT.position.set(0,dY+dH/2-bar/2,dZ); frT.castShadow=true; doorG.add(frT);
+  var frB=new THREE.Mesh(bevelBox(dW,bar,0.036,0.010,0.003),mAlu);
+  frB.position.set(0,dY-dH/2+bar/2,dZ); frB.castShadow=true; doorG.add(frB);
+  [-1,1].forEach(function(s){
+    var fr=new THREE.Mesh(bevelBox(bar,dH,0.036,0.010,0.003),mAlu);
+    fr.position.set(s*(dW/2-bar/2),dY,dZ); fr.castShadow=true; doorG.add(fr);
+  });
+  var gW=dW-2*bar+0.004, gH=dH-2*bar+0.004;
+  var pane=new THREE.Mesh(new THREE.BoxGeometry(gW,gH,0.006),mGlass);
+  pane.position.set(0,dY,dZ+0.004); doorG.add(pane);
+  var gasket=new THREE.Mesh(bevelBox(dW-0.006,dH-0.006,0.010,0.008,0.003),mRubber);
+  gasket.position.set(0,dY,dZ-0.024); doorG.add(gasket);
+  var mull=new THREE.Mesh(bevelBox(0.022,dH-2*bar,0.030,0.006,0.002),mAlu);
+  mull.position.set(-0.04,dY,dZ); doorG.add(mull);
+  /* 把手：铬杆 + 双立柱 + 端盖 */
+  var hx=dW/2-0.085, hLen=dH*0.80;
+  var hBar=new THREE.Mesh(new THREE.CylinderGeometry(0.0145,0.0145,hLen,16),mChrome);
+  hBar.position.set(hx,dY,dZ+0.070); hBar.castShadow=true; doorG.add(hBar);
+  [1,-1].forEach(function(s){
+    doorG.add(rod(new THREE.Vector3(hx,dY+s*hLen*0.36,dZ+0.008),
+                  new THREE.Vector3(hx,dY+s*hLen*0.36,dZ+0.062),0.0085,mChrome,10));
+    var cap=new THREE.Mesh(new THREE.SphereGeometry(0.0145,12,10),mChrome);
+    cap.position.set(hx,dY+s*hLen*0.5,dZ+0.070); doorG.add(cap);
+  });
+  /* 铰链两个 + 销 */
+  [1,-1].forEach(function(s){
+    var hg=new THREE.Mesh(bevelBox(0.055,0.075,0.030,0.008,0.003),mChrome);
+    hg.position.set(-(dW/2+0.014),dY+s*(dH*0.33),dZ-0.006); hg.castShadow=true; doorG.add(hg);
+    var pin=new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.085,10),mChrome);
+    pin.position.set(-(dW/2+0.030),dY+s*(dH*0.33),dZ-0.006); doorG.add(pin);
+  });
+  /* 门框四角螺丝 */
+  [[-1,1],[1,1],[-1,-1],[1,-1]].forEach(function(q){
+    var sc=new THREE.Mesh(new THREE.CylinderGeometry(0.0065,0.0065,0.006,10),mChrome);
+    sc.rotation.x=Math.PI/2;
+    sc.position.set(q[0]*(dW/2-bar/2),dY+q[1]*(dH/2-bar/2),dZ+0.019); doorG.add(sc);
+  });
+
+  /* 基座 + 万向轮（叉架 + 轮 + 轮毂 + 轴销） */
+  var base=new THREE.Mesh(bevelBox(FR_W-0.03,0.10,FR_D-0.03,0.010,0.003),mDark);
+  base.position.set(0,0.05,0); base.castShadow=true; base.receiveShadow=true; fridge.add(base);
+  var cr=0.042, cX=FR_W/2-0.085, cZ=FR_D/2-0.085;
+  [[-cX,-cZ],[cX,-cZ],[-cX,cZ],[cX,cZ]].forEach(function(pt){
+    var cg=new THREE.Group(); cg.position.set(pt[0],cr,pt[1]); fridge.add(cg);
+    [-1,1].forEach(function(s){
+      var fk=new THREE.Mesh(bevelBox(0.006,0.055,0.030,0.003,0.001),mAlu);
+      fk.position.set(s*0.021,0.030,0); fk.castShadow=true; cg.add(fk);
+    });
+    var wh=new THREE.Mesh(new THREE.CylinderGeometry(cr,cr,0.024,16),mRubber);
+    wh.rotation.z=Math.PI/2; wh.castShadow=true; cg.add(wh);
+    var hub=new THREE.Mesh(new THREE.CylinderGeometry(cr*0.45,cr*0.45,0.030,14),mAlu);
+    hub.rotation.z=Math.PI/2; cg.add(hub);
+    var ax=new THREE.Mesh(new THREE.CylinderGeometry(0.005,0.005,0.046,10),mChrome);
+    ax.rotation.z=Math.PI/2; cg.add(ax);
+  });
+
+  /* 柜顶品牌灯箱（红底白字，发光） */
+  var boxH=0.20;
+  var lbox=new THREE.Mesh(bevelBox(FR_W-0.015,boxH,FR_D-0.07,0.012,0.004),mTrimW);
+  lbox.position.set(0,TOPY+boxH/2,0); lbox.castShadow=true; lbox.receiveShadow=true; fridge.add(lbox);
+  var bTex=makeBrandStrip(1600,Math.round(1600*boxH/(FR_W-0.05)));
+  var bFace=new THREE.MeshStandardMaterial({map:bTex,emissive:0xffffff,emissiveMap:bTex,
+    emissiveIntensity:0.62,roughness:0.42});
+  var bPlane=new THREE.Mesh(new THREE.PlaneGeometry(FR_W-0.06,boxH-0.030),bFace);
+  bPlane.position.set(0,TOPY+boxH/2,FR_D/2-0.034+0.002); fridge.add(bPlane);
+
+  /* 侧板散热栅 + 角螺丝 */
+  for(var vi=0;vi<6;vi++){
+    var slot=new THREE.Mesh(bevelBox(0.006,0.012,0.26,0.003,0.001),mDark);
+    slot.position.set(FR_W/2+0.002,0.30+vi*0.058,-0.05); fridge.add(slot);
+  }
+  [[1,-1],[1,1]].forEach(function(q){
+    var sc2=new THREE.Mesh(new THREE.CylinderGeometry(0.007,0.007,0.006,10),mChrome);
+    sc2.rotation.z=Math.PI/2;
+    sc2.position.set(FR_W/2+0.004,(q[1]<0?0.26:(TOPY-0.15)),q[0]*0.22); fridge.add(sc2);
+  });
+
+  /* 接地暗部 */
+  var shadowTex=makeShadowTex();
+  var ct1=new THREE.Mesh(new THREE.PlaneGeometry(FR_W*2.4,FR_D*3.6),
+    new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false,opacity:0.92}));
+  ct1.rotation.x=-Math.PI/2; ct1.position.set(FR_X,0.006,FR_Z+0.06); scene.add(ct1);
+  var ct2=new THREE.Mesh(new THREE.PlaneGeometry(FR_W*1.12,FR_D*1.18),
+    new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false,opacity:0.72}));
+  ct2.rotation.x=-Math.PI/2; ct2.position.set(FR_X,0.004,FR_Z); scene.add(ct2);
+
+  /* ================= 相机与视角预设（距离由数学求解） ================= */
+  var FOV=40;
+  var camera=new THREE.PerspectiveCamera(FOV,innerWidth/innerHeight,0.05,1000);
+  var VIEWS={
+    wide:{t:new THREE.Vector3(0.05,2.05,0.35), hw:3.15, hh:2.05, hd:0.9, dir:new THREE.Vector3(0.44,0.16,1)},
+    mid :{t:new THREE.Vector3(-0.85,1.50,0.55), hw:1.60, hh:1.40, hd:0.7, dir:new THREE.Vector3(0.55,0.14,1)},
+    hero:{t:new THREE.Vector3(-2.45,1.05,0.42), hw:0.66, hh:1.12, hd:0.5, dir:new THREE.Vector3(0.74,0.20,1)}
+  };
+  var controls=new Orbit(camera,renderer.domElement,VIEWS.hero.t.clone(),
+    {minDistance:0.6,maxDistance:20,damping:0.14});
+
+  function applyView(name){
+    var v=VIEWS[name]||VIEWS.hero;
+    var aspect=innerWidth/Math.max(innerHeight,1);
+    var d=fitDist(v.hw,v.hh,v.hd,aspect,FOV*Math.PI/180,1.10);
+    var pos=v.t.clone().add(v.dir.clone().normalize().multiplyScalar(d));
+    controls.setView(pos,v.t);
+    camera.fov=FOV; camera.updateProjectionMatrix();
+  }
+  applyView('hero');
+
+  var bar=document.getElementById('bar');
+  bar.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    Array.prototype.forEach.call(bar.querySelectorAll('button'),function(x){x.classList.remove('on')});
+    b.classList.add('on');
+    applyView(b.getAttribute('data-v'));
+  });
+
+  addEventListener('resize',function(){
+    camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+
+  (function loop(){requestAnimationFrame(loop);controls.update();renderer.render(scene,camera);})();
+  ok=true;
+}catch(e){
+  err('✗ 初始化失败: '+(e&&(e.message||e)));
+}
+</script>
+</body>
+</html>
