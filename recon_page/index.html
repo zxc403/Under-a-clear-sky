@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>06 号便利店 · 逆向还原可拖动 3D</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:rgba(18,22,28,.82); --line:rgba(255,255,255,.12);
+    --fg:#eef2f6; --dim:#98a2b0; --accent:#69b3ff; --accent-ink:#04121f;
+    --ok:#7fd6a0; --warn:#ffb45c;
+    --r:12px; --pad:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--fg);overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  .hud{position:fixed;z-index:5}
+  header{
+    top:var(--pad);left:var(--pad);right:var(--pad);
+    display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  }
+  .brand{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+    padding:9px 13px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    display:flex;flex-direction:column;gap:2px;min-width:0;
+  }
+  .brand b{font-size:13.5px;letter-spacing:.2px;font-weight:700}
+  .brand span{font-size:11px;color:var(--dim)}
+  .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);
+    padding:5px;border-radius:var(--r);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+  .tabs button{
+    appearance:none;border:0;background:transparent;color:var(--dim);
+    font:600 12.5px/1 inherit;padding:9px 14px;border-radius:8px;cursor:pointer;white-space:nowrap;
+    transition:background .16s,color .16s;
+  }
+  .tabs button:hover{color:var(--fg);background:rgba(255,255,255,.06)}
+  .tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+  .spacer{flex:1 1 auto}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:11px 13px;
+  }
+  .meta{font-size:11.5px;color:var(--dim);line-height:1.6;max-width:270px}
+  .meta b{color:var(--fg);font-weight:600}
+  #views{
+    bottom:var(--pad);left:50%;transform:translateX(-50%);
+    display:flex;gap:6px;align-items:center;background:var(--panel);
+    border:1px solid var(--line);border-radius:999px;padding:6px;
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    max-width:calc(100vw - 2*var(--pad));overflow-x:auto;scrollbar-width:none;
+  }
+  #views::-webkit-scrollbar{display:none}
+  #views button{
+    appearance:none;border:0;background:transparent;color:var(--dim);
+    font:600 12px/1 inherit;padding:9px 15px;border-radius:999px;cursor:pointer;white-space:nowrap;
+    transition:background .16s,color .16s;
+  }
+  #views button:hover{color:var(--fg);background:rgba(255,255,255,.07)}
+  #views button[aria-pressed="true"]{background:rgba(105,179,255,.18);color:var(--accent)}
+  #views .sep{width:1px;height:20px;background:var(--line);flex:0 0 auto}
+  #views .ghost{color:var(--dim)}
+  #links{
+    top:var(--pad);right:var(--pad);display:flex;flex-direction:column;gap:7px;align-items:flex-end;
+  }
+  #links a{
+    display:block;text-decoration:none;color:var(--fg);
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:8px 12px;font-size:11.5px;font-weight:600;
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);white-space:nowrap;
+  }
+  #links a:hover{border-color:rgba(105,179,255,.5);color:var(--accent)}
+  #links a small{display:block;color:var(--dim);font-weight:500;font-size:10px;margin-top:1px}
+  #msg{
+    bottom:calc(var(--pad) + 58px);left:50%;transform:translateX(-50%);
+    background:rgba(120,32,32,.92);border:1px solid rgba(255,150,150,.35);color:#ffe9e9;
+    padding:10px 14px;border-radius:10px;font-size:12px;max-width:min(560px,90vw);line-height:1.55;
+  }
+  #msg[hidden]{display:none}
+  #load{
+    position:fixed;inset:0;z-index:9;display:grid;place-items:center;
+    background:radial-gradient(120% 90% at 50% 0%,#182029,#0b0e12 70%);
+    transition:opacity .45s ease;
+  }
+  #load.done{opacity:0;pointer-events:none}
+  #load .box{text-align:center}
+  #load .ring{
+    width:34px;height:34px;margin:0 auto 13px;border-radius:50%;
+    border:3px solid rgba(255,255,255,.14);border-top-color:var(--accent);
+    animation:spin .9s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #load p{margin:0;font-size:12.5px;color:var(--dim);letter-spacing:.3px}
+  @media (max-width:780px){
+    .meta{display:none}
+    #links{top:auto;bottom:calc(var(--pad) + 58px);right:var(--pad)}
+    #links a small{display:none}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<header class="hud">
+  <div class="brand">
+    <b id="ttl">06 号便利店 · 逆向还原</b>
+    <span id="sub">可拖动 · 双指缩放 · 滚轮缩放</span>
+  </div>
+  <div class="tabs" role="tablist" aria-label="模型切换">
+    <button data-model="store" role="tab" aria-selected="true">MINISTOP 便利店</button>
+    <button data-model="sakura" role="tab" aria-selected="false">樱花庭院小楼</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="card meta" id="meta"></div>
+</header>
+
+<div class="hud" id="links"></div>
+
+<div class="hud" id="views" role="toolbar" aria-label="机位与操作"></div>
+
+<div class="hud" id="msg" hidden></div>
+
+<div id="load"><div class="box"><div class="ring"></div><p id="ltxt">正在加载模型…</p></div></div>
+
+<script type="module">
+import * as THREE from './libs/three.module.js';
+import { OrbitControls } from './libs/addons/controls/OrbitControls.js';
+import { GLTFLoader } from './libs/addons/loaders/GLTFLoader.js';
+
+const ROOT = '/Under-a-clear-sky/shots/';
+
+const MODELS = {
+  store: {
+    url: './store.glb',
+    title: '第一组 · MINISTOP 便利店',
+    sub: '写实渲染还原 · 白瓷砖墙 / 黄蓝灯箱 / 三色条纹雨棚 / 门口三台设备',
+    note: '模型由 Blender 场景导出（Cycles 出图同源）',
+    views: [
+      { id:'fig1', name:'机位 1 · 平视', pos:[1.2,1.70,16.5], tgt:[0.6,2.0,2.0], fov:40.3 },
+      { id:'fig2', name:'机位 2 · 俯视', pos:[1.8,9.5,15.0],  tgt:[0.3,1.8,0],   fov:37.4 }
+    ],
+    flat: [
+      { label:'平视原渲染图', note:'shots/reconA/fig1.png', href: ROOT+'reconA/fig1.png' },
+      { label:'俯视原渲染图', note:'shots/reconA/fig2.png', href: ROOT+'reconA/fig2.png' },
+      { label:'双机位对照条', note:'shots/reconA/montage.png', href: ROOT+'reconA/montage.png' }
+    ]
+  },
+  sakura: {
+    url: './sakura.glb',
+    title: '第二组 · 樱花庭院小楼',
+    sub: '方块体素还原 · 层叠瓦檐 / 彩色招牌块 / 空调外机 / 粉白花簇',
+    note: '模型由 Blender 场景导出（Cycles 出图同源）',
+    views: [
+      { id:'fig3', name:'机位 A', pos:[7.8,3.9,12.5],  tgt:[0.2,2.9,0.4], fov:40.3 },
+      { id:'fig4', name:'机位 B', pos:[-6.8,4.4,11.5], tgt:[0.4,2.6,0.4], fov:35.6 }
+    ],
+    flat: [
+      { label:'机位 A 原渲染图', note:'shots/reconB/fig3.png', href: ROOT+'reconB/fig3.png' },
+      { label:'机位 B 原渲染图', note:'shots/reconB/fig4.png', href: ROOT+'reconB/fig4.png' },
+      { label:'双机位对照条', note:'shots/reconB/montage.png', href: ROOT+'reconB/montage.png' }
+    ]
+  }
+};
+
+// ---- renderer / scene ----
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x93aec9);
+scene.fog = new THREE.Fog(0x93aec9, 70, 210);
+
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 600);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.85;
+controls.zoomSpeed = 0.9;
+controls.minDistance = 1.5;
+controls.maxDistance = 90;
+controls.maxPolarAngle = Math.PI * 0.497;
+controls.autoRotateSpeed = 0.7;
+
+// environment for PBR reflections
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+{
+  const sky = new THREE.Scene();
+  const g = new THREE.SphereGeometry(60, 24, 16);
+  const m = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { top:{value:new THREE.Color(0xbcd7f2)}, bot:{value:new THREE.Color(0x6f6a5e)} },
+    vertexShader: 'varying vec3 vp; void main(){ vp = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: 'varying vec3 vp; uniform vec3 top; uniform vec3 bot; void main(){ float h = normalize(vp).y*0.5+0.5; gl_FragColor = vec4(mix(bot, top, smoothstep(0.35,0.85,h)), 1.0); }'
+  });
+  sky.add(new THREE.Mesh(g, m));
+  scene.environment = pmrem.fromScene(sky, 0.04).texture;
+  sky.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+}
+
+const hemi = new THREE.HemisphereLight(0xc6dcf2, 0x6d6457, 0.85);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xfff2df, 2.5);
+sun.position.set(-20, 28, 16);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.02;
+const sc = sun.shadow.camera;
+sc.near = 1; sc.far = 120; sc.left = -30; sc.right = 30; sc.top = 30; sc.bottom = -30;
+scene.add(sun);
+scene.add(sun.target);
+
+const fill = new THREE.DirectionalLight(0xdce8ff, 0.45);
+fill.position.set(18, 12, -14);
+scene.add(fill);
+
+// ---- state ----
+const loader = new GLTFLoader();
+let current = null;          // loaded root
+let currentKey = null;
+let loading = false;
+
+const elMsg = document.getElementById('msg');
+const elLoad = document.getElementById('load');
+const elLtxt = document.getElementById('ltxt');
+const elTtl = document.getElementById('ttl');
+const elSub = document.getElementById('sub');
+const elMeta = document.getElementById('meta');
+const elViews = document.getElementById('views');
+const elLinks = document.getElementById('links');
+
+function fail(text){
+  elMsg.hidden = false;
+  elMsg.textContent = text;
+  elLoad.classList.add('done');
+}
+function ok(){ elMsg.hidden = true; }
+
+function fit(){
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+function applyView(v, instant){
+  camera.fov = v.fov;
+  camera.updateProjectionMatrix();
+  const p = new THREE.Vector3().fromArray(v.pos);
+  const t = new THREE.Vector3().fromArray(v.tgt);
+  if (instant){
+    camera.position.copy(p);
+    controls.target.copy(t);
+    controls.update();
+  } else {
+    camera.position.lerp(p, 0.85);
+    controls.target.lerp(t, 0.85);
+  }
+  [...elViews.querySelectorAll('button[data-view]')].forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.view === v.id));
+  });
+}
+
+function buildChrome(m, key){
+  elTtl.textContent = m.title;
+  elSub.textContent = '可拖动旋转 · 双指缩放 · 滚轮缩放';
+  elMeta.innerHTML = '<b>还原要点</b><br>' + m.sub + '<br><br>' + m.note;
+
+  elViews.innerHTML = '';
+  for (const v of m.views){
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.view = v.id;
+    b.textContent = v.name;
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => applyView(v, false));
+    elViews.appendChild(b);
+  }
+  const sep = document.createElement('div'); sep.className = 'sep'; elViews.appendChild(sep);
+  const home = document.createElement('button');
+  home.type = 'button'; home.className = 'ghost'; home.textContent = '复位';
+  home.addEventListener('click', () => applyView(m.views[0], true));
+  elViews.appendChild(home);
+  const rot = document.createElement('button');
+  rot.type = 'button'; rot.className = 'ghost'; rot.textContent = '自动旋转';
+  rot.setAttribute('aria-pressed', 'false');
+  rot.addEventListener('click', () => {
+    controls.autoRotate = !controls.autoRotate;
+    rot.setAttribute('aria-pressed', String(controls.autoRotate));
+  });
+  elViews.appendChild(rot);
+
+  elLinks.innerHTML = '';
+  for (const f of m.flat){
+    const a = document.createElement('a');
+    a.href = f.href; a.target = '_blank'; a.rel = 'noopener';
+    a.innerHTML = f.label + '<small>' + f.note + '</small>';
+    elLinks.appendChild(a);
+  }
+
+  // tab state
+  document.querySelectorAll('.tabs button').forEach(b => {
+    b.setAttribute('aria-selected', String(b.dataset.model === key));
+  });
+}
+
+function load(key){
+  if (loading) return;
+  const m = MODELS[key];
+  if (!m){ fail('未知模型：' + key); return; }
+  loading = true;
+  currentKey = key;
+  buildChrome(m, key);
+  elLoad.classList.remove('done');
+  elLtxt.textContent = '正在加载 ' + m.title + ' …';
+
+  loader.load(m.url, (gltf) => {
+    ok();
+    if (current){
+      scene.remove(current);
+      current.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(x => x.dispose());
+      });
+    }
+    current = gltf.scene;
+    current.traverse(o => {
+      if (o.isMesh){
+        o.castShadow = true;
+        o.receiveShadow = true;
+        if (o.material && 'envMapIntensity' in o.material) o.material.envMapIntensity = 0.85;
+      }
+    });
+    scene.add(current);
+    // aim the sun at the model centre
+    const box = new THREE.Box3().setFromObject(current);
+    const c = box.getCenter(new THREE.Vector3());
+    sun.target.position.copy(c);
+    sun.position.set(c.x - 20, c.y + 28, c.z + 16);
+    sun.target.updateMatrixWorld();
+    applyView(m.views[0], true);
+    controls.autoRotate = false;
+    elViews.querySelectorAll('button').forEach(b => {
+      if (b.textContent === '自动旋转') b.setAttribute('aria-pressed', 'false');
+    });
+    loading = false;
+    elLoad.classList.add('done');
+  }, (ev) => {
+    if (ev && ev.total){
+      elLtxt.textContent = '正在加载 … ' + Math.round(ev.loaded / ev.total * 100) + '%';
+    }
+  }, (err) => {
+    console.error(err);
+    loading = false;
+    fail('模型加载失败：' + m.url + '（请确认 store.glb / sakura.glb 与本页同目录，且通过 http(s) 打开）');
+  });
+}
+
+document.querySelectorAll('.tabs button').forEach(b => {
+  b.addEventListener('click', () => {
+    if (b.dataset.model !== currentKey) load(b.dataset.model);
+  });
+});
+
+window.addEventListener('resize', fit);
+window.addEventListener('error', (e) => { if (!elMsg.hidden) return; fail('脚本错误：' + (e.message || 'unknown')); });
+window.addEventListener('unhandledrejection', (e) => { if (!elMsg.hidden) return; fail('运行错误：' + (e.reason && e.reason.message || e.reason)); });
+setTimeout(() => {
+  if (!current && elLoad.classList.contains('done') === false && !elMsg.hidden === false){
+    if (!current) fail('加载超时（20s）。若为本地文件方式打开，请改用 http(s) 访问。');
+  }
+}, 20000);
+
+fit();
+load('store');
+
+(function tick(){
+  requestAnimationFrame(tick);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
