@@ -3,51 +3,68 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>MINISTOP · 便利店室外 / 室内漫游</title>
+<title>MINISTOP · 便利店 室外 / 室内可交互漫游</title>
 <style>
   :root{
-    --bg:#0e1116; --panel:rgba(18,22,28,.82); --line:rgba(255,255,255,.12);
-    --ink:#eef2f6; --dim:#98a2b0; --accent:#f2c53d; --accent2:#3d7ef2;
-    --tap:rgba(255,255,255,.10); --radius:14px;
+    --bg:#0e1116; --panel:rgba(18,22,28,.84); --line:rgba(255,255,255,.13);
+    --ink:#eef2f6; --dim:#98a2b0; --accent:#f2c53d; --accent2:#4f8ef7;
+    --radius:14px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink)}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif}
   #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 
-  .hud{position:fixed;z-index:5;pointer-events:none}
-  .hud > *{pointer-events:auto}
-
-  #top{top:calc(10px + env(safe-area-inset-top));left:12px;right:12px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
-  .card{background:var(--panel);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:var(--radius);padding:9px 11px}
+  #top{position:fixed;z-index:5;top:calc(10px + env(safe-area-inset-top));left:12px;right:12px;
+    display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;pointer-events:none}
+  #top > *{pointer-events:auto}
+  .card{background:var(--panel);backdrop-filter:blur(10px);border:1px solid var(--line);
+    border-radius:var(--radius);padding:9px 11px}
   #ttl{font-size:14px;font-weight:700;letter-spacing:.2px}
-  #sub{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.45;max-width:56vw}
+  #sub{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.45;max-width:58vw}
   .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
   .tabs button{border:0;background:transparent;color:var(--dim);font-size:12.5px;font-weight:600;
     padding:7px 14px;border-radius:999px;cursor:pointer;font-family:inherit}
   .tabs button[aria-selected="true"]{background:var(--accent);color:#221c05}
 
-  #views{bottom:calc(14px + env(safe-area-inset-bottom));left:12px;right:12px;display:flex;gap:6px;
-    overflow-x:auto;padding:6px;scrollbar-width:none}
+  #views{position:fixed;z-index:5;bottom:calc(14px + env(safe-area-inset-bottom));left:12px;right:12px;
+    display:flex;gap:6px;overflow-x:auto;padding:6px;scrollbar-width:none}
   #views::-webkit-scrollbar{display:none}
-  #views button{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);backdrop-filter:blur(10px);
-    color:var(--ink);font-size:12px;font-weight:600;padding:9px 13px;border-radius:999px;cursor:pointer;font-family:inherit}
+  #views button,#views a{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);
+    backdrop-filter:blur(10px);color:var(--ink);font-size:12px;font-weight:600;padding:9px 13px;
+    border-radius:999px;cursor:pointer;font-family:inherit;text-decoration:none}
   #views button[aria-pressed="true"]{background:var(--accent);color:#221c05;border-color:transparent}
   #views button.ghost{color:var(--dim)}
+  #views .sep{flex:0 0 1px;background:var(--line);margin:0 2px}
 
-  /* ---- walk controls ---- */
-  #pad{position:fixed;z-index:6;bottom:calc(74px + env(safe-area-inset-bottom));left:16px;
+  #pad{position:fixed;z-index:6;bottom:calc(78px + env(safe-area-inset-bottom));left:16px;
     width:124px;height:124px;touch-action:none;display:none}
   #pad.on{display:block}
   #padBase{position:absolute;inset:0;border-radius:50%;background:rgba(18,22,28,.55);
     border:1px solid var(--line);backdrop-filter:blur(8px)}
   #knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;
     background:rgba(242,197,61,.92);box-shadow:0 4px 14px rgba(0,0,0,.4)}
-  #padHint{position:absolute;left:50%;bottom:-20px;transform:translateX(-50%);font-size:10.5px;
+  #padHint{position:absolute;left:50%;bottom:-19px;transform:translateX(-50%);font-size:10.5px;
     color:var(--dim);white-space:nowrap}
 
-  #msg{top:50%;left:50%;transform:translate(-50%,-50%);max-width:80vw;font-size:12.5px;line-height:1.6;
-    background:rgba(140,30,30,.92);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:12px 14px;display:none}
+  #hint{position:fixed;z-index:5;right:12px;bottom:calc(96px + env(safe-area-inset-bottom));
+    font-size:10.5px;color:var(--dim);text-align:right;line-height:1.55;pointer-events:none}
+
+  #info{position:fixed;z-index:7;right:12px;bottom:calc(150px + env(safe-area-inset-bottom));
+    width:216px;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--line);
+    border-radius:var(--radius);padding:11px 12px;display:none}
+  #info.on{display:block}
+  #infoX{position:absolute;top:6px;right:6px;border:0;background:transparent;color:var(--dim);
+    font-size:16px;line-height:1;padding:4px 7px;cursor:pointer;font-family:inherit}
+  #iCat{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.4px;
+    padding:2px 7px;border-radius:999px;background:rgba(79,142,247,.22);color:#a9c8ff}
+  #iName{font-size:13.5px;font-weight:700;margin:7px 0 2px}
+  #iPrice{font-size:17px;font-weight:800;color:var(--accent)}
+  #iNote{font-size:10px;color:var(--dim);margin-top:5px}
+
+  #msg{position:fixed;z-index:8;top:50%;left:50%;transform:translate(-50%,-50%);max-width:80vw;
+    font-size:12.5px;line-height:1.6;background:rgba(140,30,30,.94);border:1px solid rgba(255,255,255,.2);
+    border-radius:12px;padding:12px 14px;display:none}
   #msg.on{display:block}
   #load{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;
     background:var(--bg);transition:opacity .45s;font-size:13px;color:var(--dim)}
@@ -55,15 +72,15 @@
   .ring{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.16);
     border-top-color:var(--accent);animation:spin 1s linear infinite;margin:0 auto 12px}
   @keyframes spin{to{transform:rotate(360deg)}}
-  #hint{position:fixed;z-index:5;right:12px;bottom:calc(96px + env(safe-area-inset-bottom));
-    font-size:10.5px;color:var(--dim);text-align:right;line-height:1.5;pointer-events:none}
-  @media (max-width:520px){ #sub{max-width:70vw} }
+  #fade{position:fixed;inset:0;z-index:8;background:#0e1116;opacity:0;pointer-events:none;transition:opacity .3s}
+  #fade.on{opacity:1;pointer-events:auto}
+  @media (max-width:520px){ #sub{max-width:64vw} #info{width:198px} }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 
-<div class="hud" id="top">
+<div id="top">
   <div class="card">
     <div id="ttl">MINISTOP · 便利店</div>
     <div id="sub">室外门头 / 室内漫游 · Blender Cycles 同源资产，AO 已烘焙进顶点色</div>
@@ -83,7 +100,16 @@
   <div id="padHint">拖动移动</div>
 </div>
 
-<div class="hud" id="msg"></div>
+<div id="info" aria-live="polite">
+  <button id="infoX" type="button" aria-label="关闭商品信息">×</button>
+  <div><span id="iCat">冷藏</span></div>
+  <div id="iName">冰咖啡 340ml</div>
+  <div id="iPrice">¥6.0</div>
+  <div id="iNote">示例商品数据 · 仅作交互演示</div>
+</div>
+
+<div id="msg"></div>
+<div id="fade"></div>
 <div id="load"><div style="text-align:center"><div class="ring"></div><div id="ltxt">正在加载模型…</div></div></div>
 
 <script type="module">
@@ -91,10 +117,10 @@ import * as THREE from './libs/three.module.js';
 import { OrbitControls } from './libs/addons/controls/OrbitControls.js';
 import { GLTFLoader } from './libs/addons/loaders/GLTFLoader.js';
 
-/* ============================================================
-   Coordinate note: assets are glTF (Y-up). Blender (x,y,z)
-   maps to glTF (x, z, -y).
-   ============================================================ */
+/* =========================================================================
+   Assets are glTF (Y-up). The Blender authoring space maps as
+   Blender (x, y, z)  ->  glTF (x, z, -y).
+   ========================================================================= */
 
 const ROOT = '/Under-a-clear-sky/shots/';
 
@@ -105,9 +131,9 @@ const MODES = {
     sub: '精修 v2 门头 · 白瓷砖墙 / 黄蓝灯箱 / 条纹雨棚 / 门口三台设备',
     kind: 'orbit',
     views: [
-      { id:'o1', name:'门头 hero', pos:[1.05,1.72,12.60], tgt:[0.30,1.95,-0.60], fov:33.4 },
-      { id:'o2', name:'三设备', pos:[2.30,1.15,6.40],  tgt:[2.20,0.95,-3.90], fov:31.9 },
-      { id:'o3', name:'全景',   pos:[-1.60,2.60,16.50], tgt:[-1.20,1.60,2.00], fov:30.0 }
+      { id:'o1', name:'门头 hero', pos:[1.05,1.72,12.60], tgt:[0.30,1.95,0.60],  fov:33.4 },
+      { id:'o2', name:'三设备',    pos:[2.30,1.15,6.40],  tgt:[2.20,0.95,3.90],  fov:31.9 },
+      { id:'o3', name:'全景',      pos:[-1.60,2.60,16.50],tgt:[-1.20,1.60,2.00], fov:30.0 }
     ],
     links: [
       { label:'门头 hero 渲染图', href: ROOT+'reconv2/hero.png' },
@@ -120,26 +146,90 @@ const MODES = {
     title: 'MINISTOP · 便利店 · 室内',
     sub: '冷藏柜墙 / 双面货架 / 收银台背柜 / 天花板灯管 / 水磨石地面',
     kind: 'walk',
-    // Blender (x,y,z) -> glTF (x, z, -y)
     views: [
-      { id:'i1', name:'主通道', pos:[0.00,1.58,2.05],  tgt:[0.00,1.05,-3.10] },
-      { id:'i2', name:'门角视角', pos:[2.28,1.74,1.70], tgt:[-2.20,0.90,-2.20] },
-      { id:'i3', name:'望向门口', pos:[-2.40,1.62,-1.20],tgt:[0.85,1.26,2.40] },
-      { id:'i4', name:'全店俯瞰', pos:[-2.70,2.55,2.10], tgt:[1.30,0.80,-3.20] }
+      { id:'i1', name:'主通道',   pos:[0.00,1.58,2.05],   tgt:[0.00,1.05,-3.10] },
+      { id:'i2', name:'门角视角', pos:[2.28,1.74,1.70],   tgt:[-2.20,0.90,-2.20] },
+      { id:'i3', name:'望向门口', pos:[-2.40,1.62,-1.20], tgt:[0.85,1.26,2.40] },
+      { id:'i4', name:'全店俯瞰', pos:[-2.70,2.55,2.10],  tgt:[1.30,0.80,-3.20] }
     ],
     links: [
-      { label:'室内主通道渲染图', href: ROOT+'reconint/intA.png' },
-      { label:'室内门角渲染图',   href: ROOT+'reconint/intB.png' },
-      { label:'室内望向门口',     href: ROOT+'reconint/intC.png' },
-      { label:'室内全店俯瞰',     href: ROOT+'reconint/intD.png' }
+      { label:'主通道渲染图', href: ROOT+'reconint/intA.png' },
+      { label:'门角渲染图',   href: ROOT+'reconint/intB.png' },
+      { label:'望向门口',     href: ROOT+'reconint/intC.png' },
+      { label:'全店俯瞰',     href: ROOT+'reconint/intD.png' }
     ]
   }
 };
 
-/* ---------- renderer / scene ---------- */
+/* ---------- product catalogue (demo data for the interaction layer) ---------- */
+const CATALOG = [
+  ['饭团（鲑鱼）','¥5.5','冷藏'],
+  ['冰咖啡 340ml','¥6.0','冷藏'],
+  ['矿泉水 550ml','¥3.0','冷藏'],
+  ['绿茶 500ml','¥4.5','冷藏'],
+  ['可乐 500ml','¥5.0','冷藏'],
+  ['牛奶 250ml','¥4.0','冷藏'],
+  ['三明治（火腿蛋）','¥8.5','冷藏'],
+  ['便当（照烧鸡）','¥15.0','冷藏'],
+  ['泡面（豚骨）','¥7.5','常温'],
+  ['面包（红豆）','¥4.5','常温'],
+  ['口香糖','¥3.5','常温'],
+  ['湿纸巾','¥5.5','常温'],
+  ['电池 2 粒','¥9.0','常温'],
+  ['冰淇淋','¥6.5','冷冻'],
+  ['关东煮（鸡蛋）','¥3.0','热食'],
+  ['热狗','¥6.0','热食']
+];
+
+/* product slot positions, mirroring the interior build (glTF space) */
+const PRODUCTS = [];
+for (let i = 0; i < 5; i++) {                       // refrigerated wall
+  const dx = -2.20 + i * 1.10;
+  for (let s = 0; s < 4; s++) {
+    const zb = 0.52 + s * 0.44;
+    for (let k = 0; k < 4; k++) {
+      const h = 0.15 + 0.035 * ((i + s + k) % 3);
+      PRODUCTS.push({ x: dx - 0.30 + k * 0.20, y: zb + 0.02 + h / 2, z: -3.14,
+                      c: (i + s + k) % CATALOG.length });
+    }
+  }
+}
+for (let r = 0; r < 2; r++) {                       // two gondola rows, both faces
+  const ry = [0.20, 1.70][r];
+  for (const sy of [-1, 1]) {
+    for (let s = 0; s < 3; s++) {
+      const zb = 0.52 + s * 0.30;
+      const y = ry + sy * 0.26;
+      for (let k = 0; k < 7; k++) {
+        const h = 0.13 + 0.045 * ((r * 3 + (sy < 0 ? 0 : 2) + s + k) % 3);
+        PRODUCTS.push({ x: -1.30 + k * 0.44, y: zb + 0.016 + h / 2, z: -(y + sy * 0.02),
+                        c: (r * 4 + (sy < 0 ? 0 : 2) + s + k) % CATALOG.length });
+      }
+    }
+  }
+}
+for (let s = 0; s < 4; s++) {                       // behind-counter shelves
+  const zb = 1.30 + s * 0.36;
+  for (let k = 0; k < 6; k++) {
+    PRODUCTS.push({ x: -2.79, y: zb + 0.055, z: -(-2.00 + k * 0.38), c: (s + k) % CATALOG.length });
+  }
+}
+
+/* walkable room bounds + solid fixtures (glTF space) */
+const ROOM = { minX: -2.80, maxX: 2.80, minZ: -2.80, maxZ: 2.28, eye: 1.60, r: 0.30 };
+const OBSTACLES = [
+  { name:'冷藏柜墙', minX:-2.90, maxX: 2.90, minZ:-3.66, maxZ:-2.86 },
+  { name:'货架一排', minX:-1.49, maxX: 1.79, minZ:-0.71, maxZ: 0.31 },
+  { name:'货架二排', minX:-1.49, maxX: 1.79, minZ:-2.21, maxZ:-1.19 },
+  { name:'收银台',   minX: 0.20, maxX: 2.40, minZ: 0.84, maxZ: 1.72 },
+  { name:'背柜',     minX:-3.00, maxX:-2.32, minZ:-0.18, maxZ: 2.28 },
+  { name:'垃圾桶',   minX: 2.40, maxX: 2.84, minZ: 1.68, maxZ: 2.12 }
+];
+
+/* ---------- renderer / scene / camera ---------- */
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
@@ -152,12 +242,13 @@ const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 400);
 const orbit = new OrbitControls(camera, canvas);
 orbit.enableDamping = true;
 orbit.dampingFactor = 0.08;
+orbit.rotateSpeed = 0.85;
+orbit.zoomSpeed = 0.9;
 orbit.minDistance = 1.2;
 orbit.maxDistance = 90;
 orbit.maxPolarAngle = Math.PI * 0.497;
-orbit.enabled = true;
 
-/* ---------- environment (PMREM from a gradient sky) ---------- */
+/* ---------- environment ---------- */
 const pmrem = new THREE.PMREMGenerator(renderer);
 pmrem.compileEquirectangularShader();
 {
@@ -165,16 +256,15 @@ pmrem.compileEquirectangularShader();
   const g = new THREE.SphereGeometry(50, 24, 16);
   const m = new THREE.ShaderMaterial({
     side: THREE.BackSide,
-    uniforms:{ top:{value:new THREE.Color(0xbcd7f2)}, bot:{value:new THREE.Color(0x6f6a5e)} },
+    uniforms:{ top:{ value:new THREE.Color(0xbcd7f2) }, bot:{ value:new THREE.Color(0x6f6a5e) } },
     vertexShader:'varying vec3 vp; void main(){ vp=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
     fragmentShader:'varying vec3 vp; uniform vec3 top; uniform vec3 bot; void main(){ float h=normalize(vp).y*0.5+0.5; gl_FragColor=vec4(mix(bot,top,smoothstep(0.35,0.85,h)),1.0); }'
   });
   sky.add(new THREE.Mesh(g, m));
   scene.environment = pmrem.fromScene(sky, 0.04).texture;
-  sky.traverse(o => { if(o.geometry) o.geometry.dispose(); if(o.material) o.material.dispose(); });
+  sky.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
 }
 
-/* ---------- lights ---------- */
 const hemi = new THREE.HemisphereLight(0xbcd2ea, 0x7a6a55, 0.55);
 scene.add(hemi);
 
@@ -185,298 +275,403 @@ sun.shadow.bias = -0.0006;
 sun.shadow.normalBias = 0.02;
 {
   const sc = sun.shadow.camera;
-  sc.near = 0.5; sc.far = 160; sc.left=-34; sc.right=34; sc.top=34; sc.bottom=-34;
+  sc.near = 0.5; sc.far = 170; sc.left = -36; sc.right = 36; sc.top = 36; sc.bottom = -36;
 }
-scene.add(sun); scene.add(sun.target);
+scene.add(sun);
+scene.add(sun.target);
 
 const fill = new THREE.DirectionalLight(0xdce8ff, 0.40);
 fill.position.set(18, 12, -14);
 scene.add(fill);
 
-// interior practical lights (used only in walk mode)
-const ins = [];
-const inLightSpec = [
-  [-2.00, 2.72,  0.70, 0xfff0d2, 9.0],
-  [ 0.00, 2.72,  0.70, 0xfff0d2, 9.0],
-  [ 2.00, 2.72,  0.70, 0xfff0d2, 9.0],
-  [-2.00, 2.72, -1.90, 0xfff0d2, 9.0],
-  [ 0.00, 2.72, -1.90, 0xfff0d2, 9.0],
-  [ 2.00, 2.72, -1.90, 0xfff0d2, 9.0],
-  // cold glow spilling out of the refrigerated wall (glTF Z = -3.25)
-  [-1.60, 1.60, -2.60, 0xcfe6ff, 4.5],
-  [ 1.60, 1.60, -2.60, 0xcfe6ff, 4.5]
-];
-for (const [x,y,z,col,inten] of inLightSpec){
-  const pl = new THREE.PointLight(col, inten, 9.0, 2.0);
-  pl.position.set(x,y,z);
+/* ceiling practicals, only used indoors */
+const inLights = [];
+for (const [x, y, z, col, inten] of [
+  [-2.00, 2.66, 0.70, 0xfff1d6, 15.0], [0.00, 2.66, 0.70, 0xfff1d6, 15.0], [2.00, 2.66, 0.70, 0xfff1d6, 15.0],
+  [-2.00, 2.66, -1.90, 0xfff1d6, 15.0], [0.00, 2.66, -1.90, 0xfff1d6, 15.0], [2.00, 2.66, -1.90, 0xfff1d6, 15.0],
+  [-1.60, 1.60, -2.55, 0xcfe6ff, 6.5], [1.60, 1.60, -2.55, 0xcfe6ff, 6.5]
+]) {
+  const pl = new THREE.PointLight(col, inten, 11.0, 2.0);
+  pl.position.set(x, y, z);
   pl.visible = false;
-  scene.add(pl); ins.push(pl);
+  scene.add(pl);
+  inLights.push(pl);
 }
 
-/* ---------- walk room bounds (from the interior build) ---------- */
-const ROOM = {
-  minX:-2.70, maxX:2.70,
-  minZ:-3.42, maxZ:2.10,
-  eye:1.60
-};
+/* ---------- DOM ---------- */
+const $ = id => document.getElementById(id);
+const elMsg = $('msg'), elLoad = $('load'), elLtxt = $('ltxt'), elTtl = $('ttl'),
+      elSub = $('sub'), elViews = $('views'), elHint = $('hint'), elPad = $('pad'),
+      elInfo = $('info'), elFade = $('fade');
 
-/* ---------- state ---------- */
+function fail(t){ elMsg.textContent = t; elMsg.classList.add('on'); elLoad.classList.add('done'); }
+function ok(){ elMsg.classList.remove('on'); }
+function fade(on){ elFade.classList.toggle('on', on); }
+
+function fit(){
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+/* =========================================================================
+   state
+   ========================================================================= */
 const loader = new GLTFLoader();
 let mode = 'out';
 let current = null, currentKey = null, loading = false;
-
-const elMsg=document.getElementById('msg'), elLoad=document.getElementById('load'),
-      elLtxt=document.getElementById('ltxt'), elTtl=document.getElementById('ttl'),
-      elSub=document.getElementById('sub'), elViews=document.getElementById('views'),
-      elHint=document.getElementById('hint'), elPad=document.getElementById('pad');
-
-function fail(t){ elMsg.textContent=t; elMsg.classList.add('on'); elLoad.classList.add('done'); }
-function ok(){ elMsg.classList.remove('on'); }
-
-function fit(){
-  const w=window.innerWidth, h=window.innerHeight;
-  renderer.setSize(w,h,false);
-  camera.aspect=w/h; camera.updateProjectionMatrix();
-}
+let doorProxy = null;
+const coolDoors = [];
 
 /* ---------- walk controller ---------- */
-const walk = {
-  yaw:0, pitch:0,
-  pos:new THREE.Vector3(0, ROOM.eye, 0),
-  vel:new THREE.Vector3(),
-  jx:0, jz:0,
-  active:false
-};
-function clampWalk(){
-  walk.pos.x=Math.min(ROOM.maxX, Math.max(ROOM.minX, walk.pos.x));
-  walk.pos.z=Math.min(ROOM.maxZ, Math.max(ROOM.minZ, walk.pos.z));
-  walk.pos.y=ROOM.eye;
+const walk = { yaw:0, pitch:0, pos:new THREE.Vector3(0, ROOM.eye, 0), jx:0, jz:0 };
+
+function blocked(x, z){
+  const r = ROOM.r;
+  for (const o of OBSTACLES){
+    if (x > o.minX - r && x < o.maxX + r && z > o.minZ - r && z < o.maxZ + r) return true;
+  }
+  return false;
 }
-function walkLookAt(target){
-  const d=new THREE.Vector3().subVectors(target, walk.pos);
-  walk.yaw=Math.atan2(-d.x, -d.z);
-  walk.pitch=Math.atan2(d.y, Math.hypot(d.x,d.z));
+function clampWalk(){
+  walk.pos.x = Math.min(ROOM.maxX, Math.max(ROOM.minX, walk.pos.x));
+  walk.pos.z = Math.min(ROOM.maxZ, Math.max(ROOM.minZ, walk.pos.z));
+  walk.pos.y = ROOM.eye;
+}
+function moveWalk(dx, dz){
+  const nx = walk.pos.x + dx, nz = walk.pos.z + dz;
+  if (!blocked(nx, walk.pos.z)) walk.pos.x = nx;   // slide along walls
+  if (!blocked(walk.pos.x, nz)) walk.pos.z = nz;
+  clampWalk();
+}
+function walkLookAt(t){
+  const d = new THREE.Vector3().subVectors(t, walk.pos);
+  walk.yaw = Math.atan2(-d.x, -d.z);
+  walk.pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
 }
 function applyWalkCamera(){
   camera.position.copy(walk.pos);
   camera.rotation.set(walk.pitch, walk.yaw, 0, 'YXZ');
 }
 
-/* look-drag on the canvas (walk mode only) */
-let look=null;
-canvas.addEventListener('pointerdown', e=>{
-  if (mode!=='in') return;
-  look={ x:e.clientX, y:e.clientY };
-  canvas.setPointerCapture(e.pointerId);
+/* ---------- pointer: look-drag + tap ---------- */
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let look = null, tapStart = null;
+
+function pick(cx, cy){
+  const r = canvas.getBoundingClientRect();
+  ndc.x = ((cx - r.left) / r.width) * 2 - 1;
+  ndc.y = -((cy - r.top) / r.height) * 2 + 1;
+  ray.setFromCamera(ndc, camera);
+  return ray.intersectObject(scene, true).filter(h => h.object.visible !== false);
+}
+
+canvas.addEventListener('pointerdown', e => {
+  tapStart = { x:e.clientX, y:e.clientY, t:performance.now() };
+  if (mode === 'in'){ look = { x:e.clientX, y:e.clientY };
+    try { canvas.setPointerCapture(e.pointerId); } catch(_){} }
 });
-canvas.addEventListener('pointermove', e=>{
-  if (!look || mode!=='in') return;
-  const dx=e.clientX-look.x, dy=e.clientY-look.y;
-  look.x=e.clientX; look.y=e.clientY;
-  walk.yaw   -= dx*0.0042;
-  walk.pitch -= dy*0.0034;
-  walk.pitch = Math.max(-1.15, Math.min(1.15, walk.pitch));
-  walkLookLocked=true;
+canvas.addEventListener('pointermove', e => {
+  if (!look || mode !== 'in') return;
+  const dx = e.clientX - look.x, dy = e.clientY - look.y;
+  look.x = e.clientX; look.y = e.clientY;
+  walk.yaw -= dx * 0.0042;
+  walk.pitch = Math.max(-1.15, Math.min(1.15, walk.pitch - dy * 0.0034));
   applyWalkCamera();
 });
-canvas.addEventListener('pointerup', e=>{ look=null; try{canvas.releasePointerCapture(e.pointerId);}catch(_){} });
-canvas.addEventListener('pointercancel', ()=>{ look=null; });
-let walkLookLocked=false;
+canvas.addEventListener('pointerup', e => {
+  const wasLook = !!look;
+  look = null;
+  try { canvas.releasePointerCapture(e.pointerId); } catch(_){}
+  if (!tapStart) return;
+  const moved = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y);
+  const dt = performance.now() - tapStart.t;
+  tapStart = null;
+  if (moved > 9 || dt > 520) return;            // that was a drag, not a tap
+  handleTap(e.clientX, e.clientY);
+});
+canvas.addEventListener('pointercancel', () => { look = null; tapStart = null; });
 
-/* keyboard */
-const keys=new Set();
-window.addEventListener('keydown', e=>{ keys.add(e.key.toLowerCase()); });
-window.addEventListener('keyup',   e=>{ keys.delete(e.key.toLowerCase()); });
+function handleTap(cx, cy){
+  const hits = pick(cx, cy);
+  if (!hits.length) return;
+  const hit = hits[0];
 
-/* joystick */
-const pad=document.getElementById('pad'), knob=document.getElementById('knob');
-let padId=null, padC=null;
-function padVec(e){
-  const r=pad.getBoundingClientRect();
-  const cx=r.left+r.width/2, cy=r.top+r.height/2;
-  let dx=(e.clientX-cx)/(r.width/2), dy=(e.clientY-cy)/(r.height/2);
-  const m=Math.hypot(dx,dy); if(m>1){ dx/=m; dy/=m; }
-  walk.jx=dx; walk.jz=dy;
-  knob.style.transform='translate('+(dx*36)+'px,'+(dy*36)+'px)';
+  if (mode === 'out'){
+    if (doorProxy && hit.object === doorProxy) enterStore();
+    return;
+  }
+  // indoors: cooler door first, then product lookup near the hit point
+  for (const d of coolDoors){
+    if (hit.object === d.mesh){
+      d.open = !d.open;
+      d.tgt = d.open ? -Math.PI / 3 : 0;
+      hideInfo();
+      return;
+    }
+  }
+  let best = null, bd = 0.55 * 0.55;
+  for (const p of PRODUCTS){
+    const dx = p.x - hit.point.x, dy = p.y - hit.point.y, dz = p.z - hit.point.z;
+    const d2 = dx*dx + dy*dy + dz*dz;
+    if (d2 < bd){ bd = d2; best = p; }
+  }
+  if (best) showInfo(best); else hideInfo();
 }
-pad.addEventListener('pointerdown', e=>{ padId=e.pointerId; padC=e.clientX; padVec(e); pad.setPointerCapture(e.pointerId); });
-pad.addEventListener('pointermove', e=>{ if(padId===e.pointerId) padVec(e); });
+
+function showInfo(p){
+  const [name, price, cat] = CATALOG[p.c];
+  $('iName').textContent = name;
+  $('iPrice').textContent = price;
+  $('iCat').textContent = cat;
+  elInfo.classList.add('on');
+}
+function hideInfo(){ elInfo.classList.remove('on'); }
+$('infoX').addEventListener('click', hideInfo);
+
+/* ---------- joystick ---------- */
+const pad = $('pad'), knob = $('knob');
+let padId = null;
+function padVec(e){
+  const r = pad.getBoundingClientRect();
+  let dx = (e.clientX - (r.left + r.width/2)) / (r.width/2);
+  let dy = (e.clientY - (r.top + r.height/2)) / (r.height/2);
+  const m = Math.hypot(dx, dy);
+  if (m > 1){ dx /= m; dy /= m; }
+  walk.jx = dx; walk.jz = dy;
+  knob.style.transform = 'translate(' + dx*36 + 'px,' + dy*36 + 'px)';
+}
+pad.addEventListener('pointerdown', e => {
+  padId = e.pointerId;
+  padVec(e);
+  try { pad.setPointerCapture(e.pointerId); } catch(_){}
+});
+pad.addEventListener('pointermove', e => { if (padId === e.pointerId) padVec(e); });
 function padEnd(e){
-  if(padId!==e.pointerId) return;
-  padId=null; walk.jx=0; walk.jz=0; knob.style.transform='translate(0,0)';
-  try{pad.releasePointerCapture(e.pointerId);}catch(_){}
+  if (padId !== e.pointerId) return;
+  padId = null; walk.jx = 0; walk.jz = 0;
+  knob.style.transform = 'translate(0,0)';
+  try { pad.releasePointerCapture(e.pointerId); } catch(_){}
 }
 pad.addEventListener('pointerup', padEnd);
 pad.addEventListener('pointercancel', padEnd);
 
+/* ---------- keyboard ---------- */
+const keys = new Set();
+window.addEventListener('keydown', e => keys.add(e.key.toLowerCase()));
+window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+
 /* ---------- chrome ---------- */
 function buildChrome(){
-  const m=MODES[mode];
-  elTtl.textContent=m.title;
-  elSub.textContent=m.sub;
-  elHint.innerHTML = m.kind==='walk'
-    ? '拖动屏幕 转向<br>左下摇杆 移动<br>键盘 WASD / 方向键'
-    : '拖动 旋转<br>双指 缩放<br>滚轮 缩放';
-  elPad.classList.toggle('on', m.kind==='walk');
+  const m = MODES[mode];
+  elTtl.textContent = m.title;
+  elSub.textContent = m.sub;
+  elHint.innerHTML = m.kind === 'walk'
+    ? '拖动屏幕 转向 · 左下摇杆 移动<br>WASD / 方向键 · 点冷柜门 开合<br>点货架商品 看名称价格'
+    : '拖动 旋转 · 双指 缩放 · 滚轮 缩放<br>点门上的推杆 进入店内';
+  elPad.classList.toggle('on', m.kind === 'walk');
+  hideInfo();
 
-  elViews.innerHTML='';
+  elViews.innerHTML = '';
   for (const v of m.views){
-    const b=document.createElement('button');
-    b.type='button'; b.textContent=v.name;
-    b.setAttribute('aria-pressed','false');
-    b.addEventListener('click', ()=>applyView(v, true));
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = v.name;
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => applyView(v));
     elViews.appendChild(b);
   }
-  {
-    const sep=document.createElement('div'); sep.style.cssText='flex:0 0 1px;background:var(--line);margin:0 2px';
-    elViews.appendChild(sep);
-  }
+  const sep = document.createElement('div'); sep.className = 'sep'; elViews.appendChild(sep);
   for (const l of m.links){
-    const a=document.createElement('a');
-    a.href=l.href; a.target='_blank'; a.rel='noopener';
-    a.textContent=l.label;
-    a.style.cssText='flex:0 0 auto;border:1px solid var(--line);background:rgba(18,22,28,.72);color:var(--ink);font-size:12px;padding:9px 13px;border-radius:999px;text-decoration:none;font-weight:600';
+    const a = document.createElement('a');
+    a.href = l.href; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = l.label;
     elViews.appendChild(a);
   }
-  {
-    const sep=document.createElement('div'); sep.style.cssText='flex:0 0 1px;background:var(--line);margin:0 2px';
-    elViews.appendChild(sep);
-  }
-  const home=document.createElement('button');
-  home.type='button'; home.className='ghost'; home.textContent='复位';
-  home.addEventListener('click', ()=>applyView(m.views[0], true));
+  const sep2 = document.createElement('div'); sep2.className = 'sep'; elViews.appendChild(sep2);
+  const home = document.createElement('button');
+  home.type = 'button'; home.className = 'ghost'; home.textContent = '复位';
+  home.addEventListener('click', () => applyView(m.views[0]));
   elViews.appendChild(home);
+  const rot = document.createElement('button');
+  rot.type = 'button'; rot.className = 'ghost'; rot.textContent = '自动旋转';
+  rot.setAttribute('aria-pressed', 'false');
+  rot.addEventListener('click', () => {
+    orbit.autoRotate = !orbit.autoRotate;
+    rot.setAttribute('aria-pressed', String(orbit.autoRotate));
+  });
+  elViews.appendChild(rot);
+  rot.style.display = m.kind === 'walk' ? 'none' : '';
 
-  document.querySelectorAll('.tabs button').forEach(b=>{
-    b.setAttribute('aria-selected', String(b.dataset.mode===mode));
+  document.querySelectorAll('.tabs button').forEach(b => {
+    b.setAttribute('aria-selected', String(b.dataset.mode === mode));
   });
 }
 
 function markView(id){
-  [...elViews.querySelectorAll('button')].forEach(b=>{
-    if (!b.dataset.vid) return;
-    b.setAttribute('aria-pressed', String(b.dataset.vid===id));
-  });
+  const btns = [...elViews.querySelectorAll('button')];
+  btns.forEach((b, i) => { b.dataset.vid = MODES[mode].views[i] ? MODES[mode].views[i].id : ''; });
+  btns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.vid === id)));
 }
 
-function applyView(v, instant){
-  const m=MODES[mode];
-  if (m.kind==='orbit'){
-    camera.fov=v.fov||45; camera.updateProjectionMatrix();
-    const p=new THREE.Vector3().fromArray(v.pos), t=new THREE.Vector3().fromArray(v.tgt);
-    camera.position.copy(p); orbit.target.copy(t); orbit.update();
+function applyView(v){
+  const m = MODES[mode];
+  if (m.kind === 'orbit'){
+    camera.fov = v.fov || 45;
+    camera.updateProjectionMatrix();
+    camera.position.fromArray(v.pos);
+    orbit.target.fromArray(v.tgt);
+    orbit.update();
   } else {
-    const p=new THREE.Vector3().fromArray(v.pos), t=new THREE.Vector3().fromArray(v.tgt);
-    walk.pos.copy(p); clampWalk();
-    camera.fov=45; camera.updateProjectionMatrix();
-    walkLookAt(t); applyWalkCamera();
+    camera.fov = 45;
+    camera.updateProjectionMatrix();
+    walk.pos.fromArray(v.pos);
+    clampWalk();
+    walkLookAt(new THREE.Vector3().fromArray(v.tgt));
+    applyWalkCamera();
+    hideInfo();
   }
-  // tag buttons with their view id so markView can highlight
-  [...elViews.querySelectorAll('button')].forEach((b,i)=>{ b.dataset.vid=v.id; });
   markView(v.id);
 }
 
+function enterStore(){
+  if (mode === 'in') return;
+  fade(true);
+  setTimeout(() => { setMode('in'); fade(false); }, 320);
+}
+
 function setMode(next){
-  if (next===mode) return;
-  mode=next;
-  const m=MODES[mode];
-  const isWalk = m.kind==='walk';
-  orbit.enabled=!isWalk;
-  if (isWalk){ orbit.enabled=false; } else { orbit.enabled=true; }
-  if (currentKey!==mode){ load(mode); }
-  else { buildChrome(); applyView(m.views[0], true); }
+  if (next === mode) return;
+  const goingIn = next === 'in';
+  mode = next;
+  orbit.enabled = !goingIn;
+  orbit.autoRotate = false;
+  sun.castShadow = !goingIn;
+  sun.intensity = goingIn ? 1.05 : 2.9;
+  hemi.intensity = goingIn ? 0.95 : 0.55;
+  inLights.forEach(l => l.visible = goingIn);
+  if (currentKey !== next) load(next);
+  else { buildChrome(); applyView(MODES[next].views[0]); }
 }
 
 /* ---------- load ---------- */
+function wireCoolDoors(root){
+  coolDoors.length = 0;
+  const found = [];
+  root.traverse(o => { if (o.isMesh && /CoolDoor/i.test(o.name)) found.push(o); });
+  found.sort((a, b) => a.position.x - b.position.x);
+  found.forEach(mesh => coolDoors.push({ mesh, open:false, ang:0, tgt:0 }));
+  return coolDoors.length;
+}
+
 function load(key){
   if (loading) return;
-  const m=MODES[key];
-  loading=true; currentKey=key; mode=key;
-  for (const l of ins) l.visible = (m.kind==='walk');
+  const m = MODES[key];
+  loading = true;
+  currentKey = key;
+  mode = key;
+  const goingIn = m.kind === 'walk';
+  orbit.enabled = !goingIn;
+  sun.castShadow = !goingIn;
+  sun.intensity = goingIn ? 1.05 : 2.9;
+  hemi.intensity = goingIn ? 0.95 : 0.55;
+  inLights.forEach(l => l.visible = goingIn);
+  doorProxy = null;
   buildChrome();
   elLoad.classList.remove('done');
-  elLtxt.textContent='正在加载 '+m.title+' …';
+  elLtxt.textContent = '正在加载 ' + m.title + ' …';
 
-  loader.load(m.file, gltf=>{
+  loader.load(m.file, gltf => {
     ok();
     if (current){
       scene.remove(current);
-      current.traverse(o=>{
+      current.traverse(o => {
         if (o.geometry) o.geometry.dispose();
-        if (o.material) (Array.isArray(o.material)?o.material:[o.material]).forEach(x=>x.dispose());
+        if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(x => x.dispose());
       });
     }
-    current=gltf.scene;
-    current.traverse(o=>{
-      if (o.isMesh){
-        o.castShadow=true; o.receiveShadow=true;
-        const mats=Array.isArray(o.material)?o.material:[o.material];
-        for (const mm of mats){
-          if (!mm) continue;
-          if ('envMapIntensity' in mm) mm.envMapIntensity = (m.kind==='walk') ? 0.45 : 0.60;
-        }
+    current = gltf.scene;
+    current.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const mm of mats){
+        if (!mm) continue;
+        if ('envMapIntensity' in mm) mm.envMapIntensity = goingIn ? 0.45 : 0.60;
       }
     });
     scene.add(current);
 
-    const box=new THREE.Box3().setFromObject(current);
-    const c=box.getCenter(new THREE.Vector3());
+    const box = new THREE.Box3().setFromObject(current);
+    const c = box.getCenter(new THREE.Vector3());
     sun.target.position.copy(c);
-    sun.position.set(c.x+15.2, c.y+24.0, c.z+28.0);
+    sun.position.set(c.x + 15.2, c.y + 24.0, c.z + 28.0);
     sun.target.updateMatrixWorld();
 
-    if (m.kind==='walk'){
-      orbit.enabled=false;
-      ins.forEach(l=>l.visible=true);
-      applyView(m.views[0], true);
+    if (goingIn){
+      const n = wireCoolDoors(current);
+      console.log('cooler doors wired:', n);
     } else {
-      orbit.enabled=true;
-      applyView(m.views[0], true);
+      // invisible tap target over the door leaf, so tapping the push bar enters
+      const g = new THREE.BoxGeometry(1.66, 2.32, 0.34);
+      const mt = new THREE.MeshBasicMaterial({ colorWrite:false, depthWrite:false });
+      doorProxy = new THREE.Mesh(g, mt);
+      doorProxy.position.set(-1.60, 1.24, 2.45);
+      doorProxy.name = 'DoorProxy';
+      current.add(doorProxy);
     }
-    loading=false;
+
+    applyView(m.views[0]);
+    loading = false;
     elLoad.classList.add('done');
-  }, ev=>{
-    if (ev && ev.total) elLtxt.textContent='正在加载 … '+Math.round(ev.loaded/ev.total*100)+'%';
-  }, err=>{
+  }, ev => {
+    if (ev && ev.total) elLtxt.textContent = '正在加载 … ' + Math.round(ev.loaded / ev.total * 100) + '%';
+  }, err => {
     console.error(err);
-    loading=false;
-    fail('模型加载失败：'+m.file+'（请确认 int.glb / store_v2.glb 与本页同目录，并经 http(s) 打开）');
+    loading = false;
+    fail('模型加载失败：' + m.file + '（请确认 store_v2.glb / int.glb 与本页同目录，并经 http(s) 打开）');
   });
 }
 
-document.querySelectorAll('.tabs button').forEach(b=>{
-  b.addEventListener('click', ()=>setMode(b.dataset.mode));
+document.querySelectorAll('.tabs button').forEach(b => {
+  b.addEventListener('click', () => setMode(b.dataset.mode));
 });
 
 window.addEventListener('resize', fit);
-window.addEventListener('error', e=>{ if(!elMsg.classList.contains('on')) fail('脚本错误：'+(e.message||'unknown')); });
-window.addEventListener('unhandledrejection', e=>{ if(!elMsg.classList.contains('on')) fail('运行错误：'+((e.reason&&e.reason.message)||e.reason)); });
+window.addEventListener('error', e => { if (!elMsg.classList.contains('on')) fail('脚本错误：' + (e.message || 'unknown')); });
+window.addEventListener('unhandledrejection', e => {
+  if (!elMsg.classList.contains('on')) fail('运行错误：' + ((e.reason && e.reason.message) || e.reason));
+});
 
 /* ---------- loop ---------- */
-const clock=new THREE.Clock();
+const clock = new THREE.Clock();
 function tick(){
   requestAnimationFrame(tick);
-  const dt=Math.min(clock.getDelta(), 0.05);
+  const dt = Math.min(clock.getDelta(), 0.05);
 
-  if (mode==='in'){
-    // input vector from joystick + keyboard
-    let ix=walk.jx, iz=walk.jz;
-    if (keys.has('a')||keys.has('arrowleft'))  ix-=1;
-    if (keys.has('d')||keys.has('arrowright')) ix+=1;
-    if (keys.has('w')||keys.has('arrowup'))    iz-=1;
-    if (keys.has('s')||keys.has('arrowdown'))  iz+=1;
-    const mag=Math.hypot(ix,iz);
-    if (mag>1){ ix/=mag; iz/=mag; }
-
-    if (mag>0.001){
-      const speed=2.1;
-      const fwd=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(0, walk.yaw, 0));
-      const rgt=new THREE.Vector3(1,0,0).applyEuler(new THREE.Euler(0, walk.yaw, 0));
-      walk.pos.addScaledVector(fwd, -iz*speed*dt);
-      walk.pos.addScaledVector(rgt,  ix*speed*dt);
-      clampWalk();
+  if (mode === 'in'){
+    let ix = walk.jx, iz = walk.jz;
+    if (keys.has('a') || keys.has('arrowleft'))  ix -= 1;
+    if (keys.has('d') || keys.has('arrowright')) ix += 1;
+    if (keys.has('w') || keys.has('arrowup'))    iz -= 1;
+    if (keys.has('s') || keys.has('arrowdown'))  iz += 1;
+    const mag = Math.hypot(ix, iz);
+    if (mag > 1){ ix /= mag; iz /= mag; }
+    if (mag > 0.001){
+      const speed = 2.0;
+      const fwd = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, walk.yaw, 0));
+      const rgt = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, walk.yaw, 0));
+      moveWalk((-iz * fwd.x + ix * rgt.x) * speed * dt, (-iz * fwd.z + ix * rgt.z) * speed * dt);
       applyWalkCamera();
-      walkLookLocked=false;
+    }
+    for (const d of coolDoors){
+      if (Math.abs(d.ang - d.tgt) > 0.002){
+        d.ang += (d.tgt - d.ang) * Math.min(1, dt * 9);
+        d.mesh.rotation.y = d.ang;
+      }
     }
   } else {
     orbit.update();
