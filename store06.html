@@ -18,7 +18,6 @@
   }
   #app{position:fixed; inset:0}
   canvas{display:block}
-
   .panel{
     position:fixed; z-index:10; background:var(--panel);
     border:1px solid var(--line); border-radius:var(--radius);
@@ -31,42 +30,29 @@
   .hud dl{margin-top:10px; display:grid; grid-template-columns:auto 1fr; gap:3px 10px; font-size:11.5px}
   .hud dt{color:var(--ink-soft)}
   .hud dd{font-variant-numeric:tabular-nums}
-  .tag{
-    display:inline-block; padding:1px 7px; border-radius:999px; font-size:11px;
-    background:rgba(61,143,111,.14); color:#2f7358; border:1px solid rgba(61,143,111,.28)
-  }
+  .tag{display:inline-block; padding:1px 7px; border-radius:999px; font-size:11px;
+    background:rgba(61,143,111,.14); color:#2f7358; border:1px solid rgba(61,143,111,.28)}
   .tag.alt{background:rgba(180,83,31,.12); color:var(--warn); border-color:rgba(180,83,31,.26)}
-
-  .bar{
-    left:50%; bottom:18px; transform:translateX(-50%);
+  .bar{left:50%; bottom:18px; transform:translateX(-50%);
     display:flex; flex-wrap:wrap; gap:8px; padding:10px; justify-content:center;
-    max-width:calc(100vw - 32px);
-  }
-  .bar button{
-    appearance:none; border:1px solid var(--line); background:rgba(255,255,255,.7);
+    max-width:calc(100vw - 32px)}
+  .bar button{appearance:none; border:1px solid var(--line); background:rgba(255,255,255,.7);
     color:var(--ink); font-size:12.5px; padding:8px 13px; border-radius:9px;
     cursor:pointer; transition:background .15s,border-color .15s,color .15s;
-    font-family:inherit; white-space:nowrap;
-  }
+    font-family:inherit; white-space:nowrap}
   .bar button:hover{background:#fff; border-color:rgba(61,143,111,.5)}
   .bar button.on{background:var(--brand); border-color:var(--brand); color:var(--brand-ink)}
   .bar .sep{width:1px; align-self:stretch; background:var(--line); margin:2px 2px}
-
-  #load{
-    position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center;
-    background:#dfe9f2; transition:opacity .45s ease;
-  }
+  #load{position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center;
+    background:#dfe9f2; transition:opacity .45s ease}
   #load.done{opacity:0; pointer-events:none}
   #load .box{text-align:center}
   #load .t{font-size:14px; color:var(--ink)}
   #load .bar2{width:240px; height:6px; background:#c5d2dd; border-radius:3px; margin:14px auto 0; overflow:hidden}
   #load .fill{height:100%; width:0; background:var(--brand); transition:width .2s}
   #load .n{font-size:11.5px; color:var(--ink-soft); margin-top:8px}
-
-  #err{
-    left:16px; bottom:16px; padding:10px 14px; font-size:12px; color:var(--warn);
-    display:none; max-width:min(440px,80vw); line-height:1.6
-  }
+  #err{left:16px; bottom:16px; padding:10px 14px; font-size:12px; color:var(--warn);
+    display:none; max-width:min(440px,80vw); line-height:1.6}
   #err.show{display:block}
   #err code{font-size:11px; color:var(--ink-soft)}
   .hint{font-size:11px; color:var(--ink-soft)}
@@ -76,6 +62,10 @@
     .bar button{padding:7px 10px; font-size:12px}
   }
 </style>
+<!-- 三维运行时：与游戏 mainstreet.html 同构的 UMD r147，自托管于 libs_umd/ -->
+<script src="./libs_umd/three.min.js"></script>
+<script src="./libs_umd/OrbitControls.js"></script>
+<script src="./libs_umd/GLTFLoader.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -89,7 +79,7 @@
     <dt>当前 06</dt><dd id="hudMode"><span class="tag">我的资产</span> store_v2.glb</dd>
     <dt>邻栋</dt><dd>7 栋 · 游戏原版 · scale 1.12</dd>
   </dl>
-  <p class="sub hint" style="margin-top:8px">拖拽旋转 · 滚轮缩放 · 右键平移</p>
+  <p class="sub hint" style="margin-top:8px">拖拽旋转 · 滚轮缩放 · 双指/右键平移</p>
 </section>
 
 <nav class="bar panel" aria-label="视图与对比控制">
@@ -114,270 +104,239 @@
   </div>
 </div>
 
-<script type="module">
-/* =====================================================================
-   零 importmap 装配：three 与 addons 全部动态 import。
-   addons 源码里的裸名 `from 'three'` 与相对引用，运行时改写成绝对地址后
-   以 Blob 模块导入，从而在无 importmap 的静态托管上也能解析。
-   ===================================================================== */
-function fail(msg, detail){
-  const e = document.getElementById('err');
-  e.innerHTML = msg + (detail ? '<br><code>' + String(detail).slice(0,200) + '</code>' : '');
-  e.classList.add('show');
-  document.getElementById('load').classList.add('done');
-}
-function fatal(msg, detail){ fail(msg, detail); }
+<script>
+/* 兜底：三维运行时任何一个文件没到位就给出明确提示，不白屏 */
+(function(){
+  function bad(n){
+    var e=document.getElementById('err');
+    e.innerHTML='三维运行时未就绪：'+n+' 加载失败。请刷新重试。<br><code>libs_umd/</code> 需与本页同域可达';
+    e.classList.add('show');
+    document.getElementById('load').classList.add('done');
+  }
+  window.addEventListener('load',function(){
+    if(!window.THREE) bad('three.min.js');
+    else if(!THREE.OrbitControls) bad('OrbitControls.js');
+    else if(!THREE.GLTFLoader) bad('GLTFLoader.js');
+  });
+})();
+</script>
 
-const BASE = document.baseURI;
-const THREE_URL = new URL('./libs/three.module.js', BASE).href;
+<script>
+(function(){
+'use strict';
+if(!window.THREE) return; /* 兜底脚本已提示 */
 
-async function importAddon(rel){
-  const abs = new URL(rel, BASE).href;
-  const res = await fetch(abs, { cache:'force-cache' });
-  if(!res.ok) throw new Error(rel + ' -> HTTP ' + res.status);
-  let src = await res.text();
-  src = src.replace(
-    /(from\s*|import\s*\(\s*)(['"])([^'"]+)\2/g,
-    function(m, pre, q, spec){
-      if(spec === 'three') return pre + q + THREE_URL + q;
-      if(spec.charAt(0) === '.' || spec.charAt(0) === '/') return pre + q + new URL(spec, abs).href + q;
-      return m;
-    }
-  );
-  const url = URL.createObjectURL(new Blob([src], { type:'text/javascript' }));
-  return import(url);
-}
-
-let THREE, OrbitControls, GLTFLoader;
-try{
-  THREE = await import('./libs/three.module.js');
-  OrbitControls = (await importAddon('./libs/addons/controls/OrbitControls.js')).OrbitControls;
-  GLTFLoader = (await importAddon('./libs/addons/loaders/GLTFLoader.js')).GLTFLoader;
-}catch(e){
-  fatal('三维引擎未能载入，无法显示街景。', e && e.message);
-  throw e;
-}
-
-/* ---------- 常量 ---------- */
-const SKY = 0xdfe9f2;
-const GAME_SCALE = 1.12;
-const TARGET_H = 9.27 * GAME_SCALE;   /* 邻栋 store_04 高 9.27 × 1.12 ≈ 10.4 */
+var SKY = 0xdfe9f2;
+var GAME_SCALE = 1.12;
+var TARGET_H = 9.27 * GAME_SCALE;   /* 邻栋 store_04 高 9.27 × 1.12 ≈ 10.4 */
 
 /* 邻栋：游戏 SPA 真实位姿表 n(url, x, z, rotY, label, scale) */
-const NEIGHBOURS = [
+var NEIGHBOURS = [
   { url:'models/bbq_08.glb',        x:-15, z:  8, rot:-Math.PI/2 },
   { url:'models/shopstreet_09.glb', x:-15, z: -6, rot:-Math.PI/2 },
   { url:'models/fishshop_02.glb',   x:-15, z:-20, rot:-Math.PI/2 },
   { url:'models/cafe_03.glb',       x: 15, z: 30, rot: Math.PI/2 },
   { url:'models/ramen_12.glb',      x: 15, z: 16, rot: Math.PI/2 },
   { url:'models/residence_05.glb',  x: 15, z:  2, rot: Math.PI/2 },
-  { url:'models/office_13.glb',     x: 15, z:-12, rot: Math.PI/2 },
+  { url:'models/office_13.glb',     x: 15, z:-12, rot: Math.PI/2 }
 ];
-const SLOT = { x:-15, z:22, rot:-Math.PI/2 };
-const SRC  = { mine:'recon_page/store_v2.glb', game:'models/store_04.glb' };
+var SLOT = { x:-15, z:22, rot:-Math.PI/2 };
+var SRC  = { mine:'recon_page/store_v2.glb', game:'models/store_04.glb' };
 
-/* 我的资产是"地景式"导出：剔除承托板 / 棕榈 / 电线杆，保留遮阳伞与街具 */
+/* 我的资产是"地景式"导出：剔除承托板 / 棕榈 / 电线杆，保留遮阳伞与 Gate4 街具 */
 function isClutter(name){
-  const n = (name || '').toLowerCase();
-  if(/umbrella|umpole/.test(n)) return false;             /* 遮阳伞保留 */
+  var n = (name || '').toLowerCase();
+  if(/umbrella|umpole/.test(n)) return false;
   return /(asphalt|ground|slab|plane|palm|tree|trunk|leaf|bloss|pole|wire|cross|^pot|^br\d)/.test(n);
 }
 
+function fail(msg, detail){
+  var e = document.getElementById('err');
+  e.innerHTML = msg + (detail ? '<br><code>' + String(detail).slice(0,200) + '</code>' : '');
+  e.classList.add('show');
+}
+function g(id){ return document.getElementById(id); }
+
 try{
-/* ---------- 场景（复刻游戏 mainstreet 环境） ---------- */
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(SKY);
-scene.fog = new THREE.Fog(SKY, 160, 420);
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(SKY);
+  scene.fog = new THREE.Fog(SKY, 160, 420);
 
-const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 700);
-camera.position.set(0, 9, 30);
+  var camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 700);
+  camera.position.set(0, 9, 30);
 
-const renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-if('outputColorSpace' in renderer && THREE.SRGBColorSpace){
-  renderer.outputColorSpace = THREE.SRGBColorSpace;        /* three r152+ */
-}else if(THREE.sRGBEncoding !== undefined){
-  renderer.outputEncoding = THREE.sRGBEncoding;            /* three 旧版 */
-}
-renderer.toneMapping = THREE.NoToneMapping;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-document.getElementById('app').appendChild(renderer.domElement);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 2, 0);
-controls.maxPolarAngle = Math.PI / 2.05;
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.update();
-
-const sun = new THREE.DirectionalLight(0xffffff, 1.9);
-sun.position.set(40, 60, 30);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -70; sun.shadow.camera.right = 70;
-sun.shadow.camera.top = 70;   sun.shadow.camera.bottom = -70;
-sun.shadow.camera.near = 1;   sun.shadow.camera.far = 260;
-sun.shadow.camera.updateProjectionMatrix();
-scene.add(sun);
-scene.add(new THREE.HemisphereLight(0xcfe8ff, 0xb0a890, 1.35));
-
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(400, 300),
-  new THREE.MeshStandardMaterial({ color:0xb0b6ba, roughness:1 })
-);
-ground.rotation.x = -Math.PI/2;
-ground.position.y = -0.05;
-ground.receiveShadow = true;
-scene.add(ground);
-
-/* ---------- 工具 ---------- */
-const loader = new GLTFLoader();
-function shade(root){
-  root.traverse(function(o){
-    if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; }
-  });
-}
-function slotGroupOf(def){
-  const g = new THREE.Group();
-  g.position.set(def.x, 0, def.z);
-  g.rotation.y = def.rot;
-  g.scale.setScalar(GAME_SCALE);
-  return g;
-}
-
-const TOTAL = 1 + NEIGHBOURS.length;
-let pending = TOTAL;
-const fillEl = document.getElementById('loadFill');
-const nEl = document.getElementById('loadN');
-function step(){
-  pending = Math.max(0, pending - 1);
-  const doneN = TOTAL - pending;
-  fillEl.style.width = Math.round(doneN / TOTAL * 100) + '%';
-  nEl.textContent = doneN + ' / ' + TOTAL;
-  if(pending === 0) document.getElementById('load').classList.add('done');
-}
-
-NEIGHBOURS.forEach(function(def){
-  const holder = slotGroupOf(def);
-  scene.add(holder);
-  loader.load(def.url, function(g){
-    shade(g.scene); holder.add(g.scene); step();
-  }, undefined, function(){ step(); });
-});
-
-/* ---------- 06 槽位 ---------- */
-const slot = new THREE.Group();
-slot.position.set(SLOT.x, 0, SLOT.z);
-slot.rotation.y = SLOT.rot;
-scene.add(slot);
-
-let holder = new THREE.Group();
-slot.add(holder);
-let rotNudge = 0;
-function applyNudge(){ slot.rotation.y = SLOT.rot + rotNudge; }
-
-/* 剔除承托板/植被 → 等比拟合到邻栋尺度 → 居中落地 */
-function fitAsset(root){
-  const kill = [];
-  root.traverse(function(o){ if(o.isMesh && isClutter(o.name)) kill.push(o); });
-  kill.forEach(function(o){ if(o.parent) o.parent.remove(o); });
-
-  root.updateMatrixWorld(true);
-  let box = new THREE.Box3().setFromObject(root);
-  let size = box.getSize(new THREE.Vector3());
-  if(size.y > 0.001){
-    root.scale.multiplyScalar(TARGET_H / size.y);
-    root.updateMatrixWorld(true);
-    box = new THREE.Box3().setFromObject(root);
-  }
-  const c = box.getCenter(new THREE.Vector3());
-  root.position.x -= c.x;
-  root.position.z -= c.z;
-  root.position.y -= box.min.y;
-}
-
-const hudMode = document.getElementById('hudMode');
-function clearHolder(){
-  holder.traverse(function(o){ if(o.isMesh && o.geometry) o.geometry.dispose(); });
-  slot.remove(holder);
-  holder = new THREE.Group();
-  slot.add(holder);
-}
-
-function mount(mode){
-  clearHolder();
-  const url = SRC[mode] || SRC.mine;
-  loader.load(url, function(g){
-    const root = g.scene;
-    if(mode === 'mine'){
-      fitAsset(root);
-      hudMode.innerHTML = '<span class="tag">我的资产</span> store_v2.glb';
-    }else{
-      root.scale.setScalar(GAME_SCALE);
-      hudMode.innerHTML = '<span class="tag alt">游戏原版</span> store_04.glb';
-    }
-    shade(root);
-    holder.add(root);
-    step();
-    setBtn('bMine', mode === 'mine');
-    setBtn('bGame', mode === 'game');
-  }, undefined, function(){
-    fail('06 槽位模型载入失败：' + url);
-    hudMode.innerHTML = '<span class="tag alt">载入失败</span> ' + url;
-    step();
-  });
-}
-
-/* ---------- 视图与交互 ---------- */
-const VIEWS = {
-  street: { pos:[0, 9, 30],      tgt:[0, 3, 0]    },
-  top:    { pos:[0, 95, 4],      tgt:[0, 0, 4]    },
-  close:  { pos:[-1.5, 6.5, 30], tgt:[-15, 4, 22] }
-};
-function setCam(v){
-  camera.position.set(v.pos[0], v.pos[1], v.pos[2]);
-  controls.target.set(v.tgt[0], v.tgt[1], v.tgt[2]);
-  controls.update();
-}
-function setBtn(id, on){ document.getElementById(id).classList.toggle('on', !!on); }
-const g = function(id){ return document.getElementById(id); };
-
-g('bStreet').addEventListener('click', function(){
-  setCam(VIEWS.street); setBtn('bStreet', 1); setBtn('bTop', 0); setBtn('bClose', 0);
-});
-g('bTop').addEventListener('click', function(){
-  setCam(VIEWS.top); setBtn('bTop', 1); setBtn('bStreet', 0); setBtn('bClose', 0);
-});
-g('bClose').addEventListener('click', function(){
-  setCam(VIEWS.close); setBtn('bClose', 1); setBtn('bStreet', 0); setBtn('bTop', 0);
-});
-g('bMine').addEventListener('click', function(){ mount('mine'); });
-g('bGame').addEventListener('click', function(){ mount('game'); });
-g('bRotL').addEventListener('click', function(){ rotNudge -= Math.PI/2; applyNudge(); });
-g('bRotR').addEventListener('click', function(){ rotNudge += Math.PI/2; applyNudge(); });
-
-addEventListener('resize', function(){
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
+  var renderer = new THREE.WebGLRenderer({ antialias:true });
   renderer.setSize(innerWidth, innerHeight);
-});
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;   /* r147 API */
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  g('app').appendChild(renderer.domElement);
 
-/* 看门狗：20s 收起加载层，避免白屏观感 */
-setTimeout(function(){ document.getElementById('load').classList.add('done'); }, 20000);
-
-applyNudge();
-mount('mine');
-
-(function loop(){
-  requestAnimationFrame(loop);
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 2, 0);
+  controls.maxPolarAngle = Math.PI / 2.05;
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
   controls.update();
-  renderer.render(scene, camera);
-})();
+
+  var sun = new THREE.DirectionalLight(0xffffff, 1.9);
+  sun.position.set(40, 60, 30);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -70; sun.shadow.camera.right = 70;
+  sun.shadow.camera.top = 70;   sun.shadow.camera.bottom = -70;
+  sun.shadow.camera.near = 1;   sun.shadow.camera.far = 260;
+  sun.shadow.camera.updateProjectionMatrix();
+  scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0xcfe8ff, 0xb0a890, 1.35));
+
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(400, 300),
+    new THREE.MeshStandardMaterial({ color:0xb0b6ba, roughness:1 })
+  );
+  ground.rotation.x = -Math.PI/2;
+  ground.position.y = -0.05;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  var loader = new THREE.GLTFLoader();
+  function shade(root){
+    root.traverse(function(o){
+      if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; }
+    });
+  }
+  function slotGroupOf(def){
+    var gr = new THREE.Group();
+    gr.position.set(def.x, 0, def.z);
+    gr.rotation.y = def.rot;
+    gr.scale.setScalar(GAME_SCALE);
+    return gr;
+  }
+
+  var TOTAL = 1 + NEIGHBOURS.length;
+  var pending = TOTAL;
+  function step(){
+    pending = Math.max(0, pending - 1);
+    var doneN = TOTAL - pending;
+    g('loadFill').style.width = Math.round(doneN / TOTAL * 100) + '%';
+    g('loadN').textContent = doneN + ' / ' + TOTAL;
+    if(pending === 0) g('load').classList.add('done');
+  }
+
+  NEIGHBOURS.forEach(function(def){
+    var holder = slotGroupOf(def);
+    scene.add(holder);
+    loader.load(def.url, function(gltf){
+      shade(gltf.scene); holder.add(gltf.scene); step();
+    }, undefined, function(){ step(); });
+  });
+
+  /* 06 槽位 */
+  var slot = new THREE.Group();
+  slot.position.set(SLOT.x, 0, SLOT.z);
+  slot.rotation.y = SLOT.rot;
+  scene.add(slot);
+
+  var holder = new THREE.Group();
+  slot.add(holder);
+  var rotNudge = 0;
+  function applyNudge(){ slot.rotation.y = SLOT.rot + rotNudge; }
+
+  function fitAsset(root){
+    var kill = [];
+    root.traverse(function(o){ if(o.isMesh && isClutter(o.name)) kill.push(o); });
+    kill.forEach(function(o){ if(o.parent) o.parent.remove(o); });
+
+    var box = new THREE.Box3().setFromObject(root);
+    var size = box.getSize(new THREE.Vector3());
+    if(size.y > 0.001){
+      root.scale.multiplyScalar(TARGET_H / size.y);
+      box = new THREE.Box3().setFromObject(root);
+    }
+    var c = box.getCenter(new THREE.Vector3());
+    root.position.x -= c.x;
+    root.position.z -= c.z;
+    root.position.y -= box.min.y;
+  }
+
+  function clearHolder(){
+    holder.traverse(function(o){ if(o.isMesh && o.geometry) o.geometry.dispose(); });
+    slot.remove(holder);
+    holder = new THREE.Group();
+    slot.add(holder);
+  }
+
+  function mount(mode){
+    clearHolder();
+    var url = SRC[mode] || SRC.mine;
+    loader.load(url, function(gltf){
+      var root = gltf.scene;
+      if(mode === 'mine'){
+        fitAsset(root);
+        g('hudMode').innerHTML = '<span class="tag">我的资产</span> store_v2.glb';
+      }else{
+        root.scale.setScalar(GAME_SCALE);
+        g('hudMode').innerHTML = '<span class="tag alt">游戏原版</span> store_04.glb';
+      }
+      shade(root);
+      holder.add(root);
+      step();
+      setBtn('bMine', mode === 'mine');
+      setBtn('bGame', mode === 'game');
+    }, undefined, function(){
+      fail('06 槽位模型载入失败：' + url);
+      step();
+    });
+  }
+
+  var VIEWS = {
+    street: { pos:[0, 9, 30],      tgt:[0, 3, 0]    },
+    top:    { pos:[0, 95, 4],      tgt:[0, 0, 4]    },
+    close:  { pos:[-1.5, 6.5, 30], tgt:[-15, 4, 22] }
+  };
+  function setCam(v){
+    camera.position.set(v.pos[0], v.pos[1], v.pos[2]);
+    controls.target.set(v.tgt[0], v.tgt[1], v.tgt[2]);
+    controls.update();
+  }
+  function setBtn(id, on){ g(id).classList.toggle('on', !!on); }
+
+  g('bStreet').addEventListener('click', function(){
+    setCam(VIEWS.street); setBtn('bStreet', 1); setBtn('bTop', 0); setBtn('bClose', 0);
+  });
+  g('bTop').addEventListener('click', function(){
+    setCam(VIEWS.top); setBtn('bTop', 1); setBtn('bStreet', 0); setBtn('bClose', 0);
+  });
+  g('bClose').addEventListener('click', function(){
+    setCam(VIEWS.close); setBtn('bClose', 1); setBtn('bStreet', 0); setBtn('bTop', 0);
+  });
+  g('bMine').addEventListener('click', function(){ mount('mine'); });
+  g('bGame').addEventListener('click', function(){ mount('game'); });
+  g('bRotL').addEventListener('click', function(){ rotNudge -= Math.PI/2; applyNudge(); });
+  g('bRotR').addEventListener('click', function(){ rotNudge += Math.PI/2; applyNudge(); });
+
+  addEventListener('resize', function(){
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  setTimeout(function(){ g('load').classList.add('done'); }, 20000);
+
+  applyNudge();
+  mount('mine');
+
+  (function loop(){
+    requestAnimationFrame(loop);
+    controls.update();
+    renderer.render(scene, camera);
+  })();
 }catch(e){
-  fatal('街景初始化失败。', e && e.message);
+  fail('街景初始化失败。', e && e.message);
 }
+})();
 </script>
 </body>
 </html>
