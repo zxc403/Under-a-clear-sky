@@ -147,7 +147,7 @@ var SRC  = { mine:'recon_page/store_v2.glb', game:'models/store_04.glb' };
 function isClutter(name){
   var n = (name || '').toLowerCase();
   if(/umbrella|umpole/.test(n)) return false;
-  return /(asphalt|ground|slab|plane|palm|tree|trunk|leaf|bloss|pole|wire|cross|^pot|^br\d)/.test(n);
+  return /(asphalt|ground|slab|plane|pave|pavement|curb|kerb|concrete|sidewalk|palm|tree|trunk|leaf|bloss|pole|wire|cross|^pot|^br\d)/.test(n);
 }
 
 function fail(msg, detail){
@@ -198,7 +198,7 @@ try{
     new THREE.MeshStandardMaterial({ color:0x9aa0a6, roughness:1 })
   );
   base.rotation.x = -Math.PI/2;
-  base.position.y = -0.08;
+  base.position.y = 0.10;   /* 全幅覆盖层：压住一切烘死的地面铺装 */
   base.receiveShadow = true;
   scene.add(base);
 
@@ -212,20 +212,19 @@ try{
     return m;
   }
   /* 车道 x∈[-6.5,6.5]，人行道带 x∈[±6.5,±9.5] */
-  flat(13, 300, 0, 0, 0.0,  0x6f7479);   /* 沥青车道 */
-  /* 大面地坪覆盖：浅灰连续铺装，从车道边一直铺到建筑脚下，压住邻栋自带红砖 */
-  flat(12, 300,  12.5, 0, 0.14, 0x9aa0a6);  /* 西侧覆盖（车道→建筑） */
-  flat(12, 300, -12.5, 0, 0.14, 0x9aa0a6);  /* 东侧覆盖 */
-  flat(0.35, 300,  6.6, 0, 0.04, 0xd8d4cc); /* 西路缘 */
-  flat(0.35, 300, -6.6, 0, 0.04, 0xd8d4cc); /* 东路缘 */
+  flat(13, 300, 0, 0, 0.115, 0x6f7479);   /* 沥青车道 */
+  flat(6, 300,  11.5, 0, 0.12, 0xb4b0a8);  /* 西侧人行道 */
+  flat(6, 300, -11.5, 0, 0.12, 0xb4b0a8);  /* 东侧人行道 */
+  flat(0.35, 300,  6.6, 0, 0.125, 0xd8d4cc); /* 西路缘 */
+  flat(0.35, 300, -6.6, 0, 0.125, 0xd8d4cc); /* 东路缘 */
   /* 中线虚线 */
   for(var zi=-148; zi<=148; zi+=6){
-    flat(0.22, 2.6, 0, zi, 0.05, 0xe8e4da);
+    flat(0.22, 2.6, 0, zi, 0.13, 0xe8e4da);
   }
   /* 斑马线（06 门前 z≈14 与街道中段 z≈-10 各一组） */
   [14, -10].forEach(function(zc){
     for(var k=-4; k<=4; k++){
-      flat(1.1, 2.2, k*1.5, zc, 0.055, 0xe8e4da);
+      flat(1.1, 2.2, k*1.5, zc, 0.13, 0xe8e4da);
     }
   });
 
