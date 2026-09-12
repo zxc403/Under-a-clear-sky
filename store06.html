@@ -192,41 +192,15 @@ try{
   scene.add(sun);
   scene.add(new THREE.HemisphereLight(0xcfe8ff, 0xb0a890, 1.35));
 
-  /* ---- 统一街道地面：底层 + 车道 + 人行道 + 路缘 + 中线/斑马线 ---- */
-  var base = new THREE.Mesh(
+  /* 中性基线地面：不再覆盖邻栋自带铺装（v5~v9 覆盖方案实测更糟，已回退） */
+  var ground = new THREE.Mesh(
     new THREE.PlaneGeometry(400, 300),
-    new THREE.MeshStandardMaterial({ color:0x9aa0a6, roughness:1 })
+    new THREE.MeshStandardMaterial({ color:0xb0b6ba, roughness:1 })
   );
-  base.rotation.x = -Math.PI/2;
-  base.position.y = 0.10;   /* 全幅覆盖层：压住一切烘死的地面铺装 */
-  base.receiveShadow = true;
-  scene.add(base);
-
-  function flatMat(c){ return new THREE.MeshStandardMaterial({ color:c, roughness:1 }); }
-  function flat(w, d, x, z, y, c){
-    var m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), flatMat(c));
-    m.rotation.x = -Math.PI/2;
-    m.position.set(x, y, z);
-    m.receiveShadow = true;
-    scene.add(m);
-    return m;
-  }
-  /* 车道 x∈[-6.5,6.5]，人行道带 x∈[±6.5,±9.5] */
-  flat(13, 300, 0, 0, 0.115, 0x6f7479);   /* 沥青车道 */
-  flat(6, 300,  11.5, 0, 0.12, 0xb4b0a8);  /* 西侧人行道 */
-  flat(6, 300, -11.5, 0, 0.12, 0xb4b0a8);  /* 东侧人行道 */
-  flat(0.35, 300,  6.6, 0, 0.125, 0xd8d4cc); /* 西路缘 */
-  flat(0.35, 300, -6.6, 0, 0.125, 0xd8d4cc); /* 东路缘 */
-  /* 中线虚线 */
-  for(var zi=-148; zi<=148; zi+=6){
-    flat(0.22, 2.6, 0, zi, 0.13, 0xe8e4da);
-  }
-  /* 斑马线（06 门前 z≈14 与街道中段 z≈-10 各一组） */
-  [14, -10].forEach(function(zc){
-    for(var k=-4; k<=4; k++){
-      flat(1.1, 2.2, k*1.5, zc, 0.13, 0xe8e4da);
-    }
-  });
+  ground.rotation.x = -Math.PI/2;
+  ground.position.y = -0.05;
+  ground.receiveShadow = true;
+  scene.add(ground);
 
   var loader = new THREE.GLTFLoader();
   var BRICKY = /brick|tile|pavement|terracotta|cobble|flagstone|\bpav\b/i;
