@@ -72,7 +72,7 @@
 
 <section class="panel hud" aria-label="场景说明">
   <h1>晴空之下 · 06 号便利店</h1>
-  <p class="sub">v12 · 删除邻栋烘焙街面（法线朝上+低顶面几何剔除）</p>
+  <p class="sub">v13 · 只剔除邻栋红砖铺装（暖色识别），保留路面与绿化</p>
   <dl>
     <dt>场景</dt><dd>主街（沿 Z 轴，两侧 x=±15）</dd>
     <dt>06 槽位</dt><dd>x −15 · z 22 · 朝向 −90°</dd>
@@ -220,7 +220,14 @@ try{
         var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
         var nl=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
         var up=Math.abs(ny)/nl;
-        if(maxy < 0.45 && up > 0.5) continue;
+        if(maxy < 0.45 && up > 0.5){
+          var gr=1,gg=1,gb2=1;
+          if(col){ gr=(col.getX(a)+col.getX(b)+col.getX(c))/3;
+                   gg=(col.getY(a)+col.getY(b)+col.getY(c))/3;
+                   gb2=(col.getZ(a)+col.getZ(b)+col.getZ(c))/3; }
+          /* v13：只删“砖色”地面(暖色 r-b>0.15)，保留灰路面与绿色绿化 */
+          if((gr-gb2) > 0.15 && gr > 0.45 && (gr-gg) > -0.06) continue;
+        }
         push(a); push(b); push(c);
       }
       var ng=new THREE.BufferGeometry();
