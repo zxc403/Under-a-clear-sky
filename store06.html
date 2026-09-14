@@ -72,7 +72,7 @@
 
 <section class="panel hud" aria-label="场景说明">
   <h1>晴空之下 · 06 号便利店</h1>
-  <p class="sub">游戏真实街景布局 · 06 槽位挂载验收</p>
+  <p class="sub">v11 · 地面层次修复（邻栋烘焙地面裁切 + 单一地面）</p>
   <dl>
     <dt>场景</dt><dd>主街（沿 Z 轴，两侧 x=±15）</dd>
     <dt>06 槽位</dt><dd>x −15 · z 22 · 朝向 −90°</dd>
@@ -172,6 +172,7 @@ try{
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.localClippingEnabled = true;   /* v11: 邻栋地面裁切需要 */
   g('app').appendChild(renderer.domElement);
 
   var controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -191,6 +192,19 @@ try{
   sun.shadow.camera.updateProjectionMatrix();
   scene.add(sun);
   scene.add(new THREE.HemisphereLight(0xcfe8ff, 0xb0a890, 1.35));
+
+  /* v11 修正：邻栋（游戏原版）各自把“街道铺装/红砖”烘焙进同一网格，7 栋叠在本页单一地面之上，
+     造成“地板层次乱”。这里用水平裁切面把邻栋 y<0.06 的烘焙地面削掉，只保留本页一层地面。
+     只作用于邻栋，不动 06 槽位资产。 */
+  var GROUND_CLIP = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.06);
+  function clipGround(root){
+    root.traverse(function(o){
+      if(!o.isMesh) return;
+      var ms = Array.isArray(o.material) ? o.material : [o.material];
+      for(var i=0;i<ms.length;i++){ var m=ms[i]; if(!m) continue;
+        m.clippingPlanes = [GROUND_CLIP]; m.clipShadows = true; m.needsUpdate = true; }
+    });
+  }
 
   /* 中性基线地面：不再覆盖邻栋自带铺装（v5~v9 覆盖方案实测更糟，已回退） */
   var ground = new THREE.Mesh(
@@ -242,7 +256,7 @@ try{
     var holder = slotGroupOf(def);
     scene.add(holder);
     loader.load(def.url, function(gltf){
-      shade(gltf.scene); holder.add(gltf.scene); step();
+      shade(gltf.scene); clipGround(gltf.scene); holder.add(gltf.scene); step();
     }, undefined, function(){ step(); });
   });
 
