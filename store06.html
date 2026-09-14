@@ -72,7 +72,7 @@
 
 <section class="panel hud" aria-label="场景说明">
   <h1>晴空之下 · 06 号便利店</h1>
-  <p class="sub">v11 · 地面层次修复（邻栋烘焙地面裁切 + 单一地面）</p>
+  <p class="sub">v12 · 删除邻栋烘焙街面（法线朝上+低顶面几何剔除）</p>
   <dl>
     <dt>场景</dt><dd>主街（沿 Z 轴，两侧 x=±15）</dd>
     <dt>06 槽位</dt><dd>x −15 · z 22 · 朝向 −90°</dd>
@@ -196,6 +196,43 @@ try{
   /* v11 修正：邻栋（游戏原版）各自把“街道铺装/红砖”烘焙进同一网格，7 栋叠在本页单一地面之上，
      造成“地板层次乱”。这里用水平裁切面把邻栋 y<0.06 的烘焙地面削掉，只保留本页一层地面。
      只作用于邻栋，不动 06 槽位资产。 */
+  /* v12 修正：直接删几何。邻栋把砖砌人行道/街面烘焙进单一网格（顶点色），
+     位于 y≈0.2 的水平面。按“面法线朝上 + 顶面高度<0.45”删三角形，只去烘焙街面，
+     保留墙体/树木/招牌/伞。仅作用于邻栋，不动 06 槽位资产。 */
+  function stripLowGround(root){
+    root.traverse(function(o){
+      if(!o.isMesh || !o.geometry) return;
+      var geo=o.geometry, pos=geo.attributes.position; if(!pos) return;
+      var col=geo.attributes.color, nor=geo.attributes.normal, idx=geo.index;
+      var triCount = idx ? (idx.count/3|0) : (pos.count/3|0);
+      var kp=[],kc=[],kn=[];
+      function push(i){
+        kp.push(pos.getX(i),pos.getY(i),pos.getZ(i));
+        if(col) kc.push(col.getX(i),col.getY(i),col.getZ(i));
+        if(nor) kn.push(nor.getX(i),nor.getY(i),nor.getZ(i));
+      }
+      for(var t3=0;t3<triCount;t3++){
+        var a=idx?idx.getX(t3*3):t3*3, b=idx?idx.getX(t3*3+1):t3*3+1, c=idx?idx.getX(t3*3+2):t3*3+2;
+        var ya=pos.getY(a), yb=pos.getY(b), yc=pos.getY(c);
+        var maxy = ya>yb?(ya>yc?ya:yc):(yb>yc?yb:yc);
+        var ux=pos.getX(b)-pos.getX(a), uy=yb-ya, uz=pos.getZ(b)-pos.getZ(a);
+        var vx=pos.getX(c)-pos.getX(a), vy=yc-ya, vz=pos.getZ(c)-pos.getZ(a);
+        var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+        var nl=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+        var up=Math.abs(ny)/nl;
+        if(maxy < 0.45 && up > 0.5) continue;
+        push(a); push(b); push(c);
+      }
+      var ng=new THREE.BufferGeometry();
+      ng.setAttribute('position', new THREE.Float32BufferAttribute(kp,3));
+      if(kc.length) ng.setAttribute('color', new THREE.Float32BufferAttribute(kc,3));
+      if(kn.length) ng.setAttribute('normal', new THREE.Float32BufferAttribute(kn,3));
+      else ng.computeVertexNormals();
+      ng.computeBoundingSphere();
+      o.geometry = ng;
+    });
+  }
+
   var GROUND_CLIP = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.06);
   function clipGround(root){
     root.traverse(function(o){
@@ -256,7 +293,7 @@ try{
     var holder = slotGroupOf(def);
     scene.add(holder);
     loader.load(def.url, function(gltf){
-      shade(gltf.scene); clipGround(gltf.scene); holder.add(gltf.scene); step();
+      shade(gltf.scene); stripLowGround(gltf.scene); holder.add(gltf.scene); step();
     }, undefined, function(){ step(); });
   });
 
