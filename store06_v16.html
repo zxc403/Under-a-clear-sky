@@ -433,6 +433,25 @@ try{
              geometries: info.memory.geometries, textures: info.memory.textures,
              mode: (g('hudMode')||{}).textContent || '' };
   };
+  window.__scene  = scene;
+  window.__root   = null;
+  /* __mats(): 列出当前 06 槽位资产的材质名 / 是否带贴图 / 当前颜色，
+     用于验收"白瓷砖门面是否被抹灰"。 */
+  window.__mats   = function(){
+    var r = window.__root; if(!r) return [];
+    var seen = {}, out = [];
+    r.traverse(function(o){
+      if(!o.isMesh) return;
+      var ms = Array.isArray(o.material) ? o.material : [o.material];
+      for(var i=0;i<ms.length;i++){ var m=ms[i]; if(!m) continue;
+        var key = (m.name||'') + '|' + (m.uuid||'');
+        if(seen[key]) continue; seen[key]=1;
+        out.push({ mesh:o.name, name:m.name||'', hasMap:!!m.map,
+                   color:m.color?('#'+m.color.getHexString()):null });
+      }
+    });
+    return out;
+  };
 
   setTimeout(function(){ g('load').classList.add('done'); }, 20000);
 
