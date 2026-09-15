@@ -378,6 +378,7 @@ try{
       shade(root);
       fixMetal(root);
       holder.add(root);
+      window.__root = root;
       step();
       setBtn('bMine', mode === 'mine');
       setBtn('bGame', mode === 'game');
