@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>晴空之下 · 06 号便利店 街景挂载验收</title>
+<style>
+  :root{
+    --ink:#22303a; --ink-soft:#5b6b76; --panel:rgba(255,255,255,.90);
+    --line:rgba(34,48,58,.14); --brand:#3d8f6f; --brand-ink:#ffffff;
+    --warn:#b4531f; --radius:12px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--ink); background:#dfe9f2; overflow:hidden;
+  }
+  #app{position:fixed; inset:0}
+  canvas{display:block}
+  .panel{
+    position:fixed; z-index:10; background:var(--panel);
+    border:1px solid var(--line); border-radius:var(--radius);
+    backdrop-filter:saturate(1.1) blur(8px);
+    box-shadow:0 8px 26px rgba(24,40,54,.14);
+  }
+  .hud{top:16px; left:16px; padding:14px 18px; max-width:min(360px,72vw)}
+  .hud h1{font-size:16px; letter-spacing:.2px; margin-bottom:6px}
+  .hud .sub{font-size:12px; color:var(--ink-soft); line-height:1.65}
+  .hud dl{margin-top:10px; display:grid; grid-template-columns:auto 1fr; gap:3px 10px; font-size:11.5px}
+  .hud dt{color:var(--ink-soft)}
+  .hud dd{font-variant-numeric:tabular-nums}
+  .tag{display:inline-block; padding:1px 7px; border-radius:999px; font-size:11px;
+    background:rgba(61,143,111,.14); color:#2f7358; border:1px solid rgba(61,143,111,.28)}
+  .tag.alt{background:rgba(180,83,31,.12); color:var(--warn); border-color:rgba(180,83,31,.26)}
+  .bar{left:50%; bottom:18px; transform:translateX(-50%);
+    display:flex; flex-wrap:wrap; gap:8px; padding:10px; justify-content:center;
+    max-width:calc(100vw - 32px)}
+  .bar button{appearance:none; border:1px solid var(--line); background:rgba(255,255,255,.7);
+    color:var(--ink); font-size:12.5px; padding:8px 13px; border-radius:9px;
+    cursor:pointer; transition:background .15s,border-color .15s,color .15s;
+    font-family:inherit; white-space:nowrap}
+  .bar button:hover{background:#fff; border-color:rgba(61,143,111,.5)}
+  .bar button.on{background:var(--brand); border-color:var(--brand); color:var(--brand-ink)}
+  .bar .sep{width:1px; align-self:stretch; background:var(--line); margin:2px 2px}
+  #load{position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center;
+    background:#dfe9f2; transition:opacity .45s ease}
+  #load.done{opacity:0; pointer-events:none}
+  #load .box{text-align:center}
+  #load .t{font-size:14px; color:var(--ink)}
+  #load .bar2{width:240px; height:6px; background:#c5d2dd; border-radius:3px; margin:14px auto 0; overflow:hidden}
+  #load .fill{height:100%; width:0; background:var(--brand); transition:width .2s}
+  #load .n{font-size:11.5px; color:var(--ink-soft); margin-top:8px}
+  #err{left:16px; bottom:16px; padding:10px 14px; font-size:12px; color:var(--warn);
+    display:none; max-width:min(440px,80vw); line-height:1.6}
+  #err.show{display:block}
+  #err code{font-size:11px; color:var(--ink-soft)}
+  .hint{font-size:11px; color:var(--ink-soft)}
+  @media (max-width:560px){
+    .hud{max-width:64vw; padding:11px 13px}
+    .hud dl{display:none}
+    .bar button{padding:7px 10px; font-size:12px}
+  }
+</style>
+<!-- 三维运行时：与游戏 mainstreet.html 同构的 UMD r147，自托管于 libs_umd/ -->
+<script src="./libs_umd/three.min.js"></script>
+<script src="./libs_umd/OrbitControls.js"></script>
+<script src="./libs_umd/GLTFLoader.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<section class="panel hud" aria-label="场景说明">
+  <h1>晴空之下 · 06 号便利店</h1>
+  <p class="sub">v15 · 修复邻栋金属材质 + ACES 色调映射 + 灯光回压（消除过曝）</p>
+  <dl>
+    <dt>场景</dt><dd>主街（沿 Z 轴，两侧 x=±15）</dd>
+    <dt>06 槽位</dt><dd>x −15 · z 22 · 朝向 −90°</dd>
+    <dt>当前 06</dt><dd id="hudMode"><span class="tag">我的资产</span> store_v2.glb</dd>
+    <dt>邻栋</dt><dd>7 栋 · 游戏原版 · scale 1.12</dd>
+  </dl>
+  <p class="sub hint" style="margin-top:8px">拖拽旋转 · 滚轮缩放 · 双指/右键平移</p>
+</section>
+
+<nav class="bar panel" aria-label="视图与对比控制">
+  <button id="bStreet" class="on" type="button">街道视角</button>
+  <button id="bTop" type="button">鸟瞰</button>
+  <button id="bClose" type="button">06 特写</button>
+  <span class="sep" aria-hidden="true"></span>
+  <button id="bMine" class="on" type="button">我的 06</button>
+  <button id="bGame" type="button">原版 store_04</button>
+  <span class="sep" aria-hidden="true"></span>
+  <button id="bRotL" type="button">左转 90°</button>
+  <button id="bRotR" type="button">右转 90°</button>
+</nav>
+
+<div id="err" class="panel" role="alert"></div>
+
+<div id="load">
+  <div class="box">
+    <div class="t">正在拼装主街…</div>
+    <div class="bar2"><div class="fill" id="loadFill"></div></div>
+    <div class="n" id="loadN">0 / 8</div>
+  </div>
+</div>
+
+<script>
+/* 兜底：三维运行时任何一个文件没到位就给出明确提示，不白屏 */
+(function(){
+  function bad(n){
+    var e=document.getElementById('err');
+    e.innerHTML='三维运行时未就绪：'+n+' 加载失败。请刷新重试。<br><code>libs_umd/</code> 需与本页同域可达';
+    e.classList.add('show');
+    document.getElementById('load').classList.add('done');
+  }
+  window.addEventListener('load',function(){
+    if(!window.THREE) bad('three.min.js');
+    else if(!THREE.OrbitControls) bad('OrbitControls.js');
+    else if(!THREE.GLTFLoader) bad('GLTFLoader.js');
+  });
+})();
+</script>
+
+<script>
+(function(){
+'use strict';
+if(!window.THREE) return; /* 兜底脚本已提示 */
+
+var SKY = 0xdfe9f2;
+var GAME_SCALE = 1.12;
+var TARGET_H = 9.27 * GAME_SCALE;   /* 邻栋 store_04 高 9.27 × 1.12 ≈ 10.4 */
+
+/* 邻栋：游戏 SPA 真实位姿表 n(url, x, z, rotY, label, scale) */
+var NEIGHBOURS = [
+  { url:'models/bbq_08.glb',        x:-15, z:  8, rot:-Math.PI/2 },
+  { url:'models/shopstreet_09.glb', x:-15, z: -6, rot:-Math.PI/2 },
+  { url:'models/fishshop_02.glb',   x:-15, z:-20, rot:-Math.PI/2 },
+  { url:'models/cafe_03.glb',       x: 15, z: 30, rot: Math.PI/2 },
+  { url:'models/ramen_12.glb',      x: 15, z: 16, rot: Math.PI/2 },
+  { url:'models/residence_05.glb',  x: 15, z:  2, rot: Math.PI/2 },
+  { url:'models/office_13.glb',     x: 15, z:-12, rot: Math.PI/2 }
+];
+var SLOT = { x:-15, z:22, rot:-Math.PI/2 };
+var SRC  = { mine:'recon_page/store_v2.glb', game:'models/store_04.glb' };
+
+/* 我的资产是"地景式"导出：剔除承托板 / 棕榈 / 电线杆，保留遮阳伞与 Gate4 街具 */
+function isClutter(name){
+  var n = (name || '').toLowerCase();
+  if(/umbrella|umpole/.test(n)) return false;
+  return /(asphalt|ground|slab|plane|pave|pavement|curb|kerb|concrete|sidewalk|palm|tree|trunk|leaf|bloss|pole|wire|cross|^pot|^br\d)/.test(n);
+}
+
+function fail(msg, detail){
+  var e = document.getElementById('err');
+  e.innerHTML = msg + (detail ? '<br><code>' + String(detail).slice(0,200) + '</code>' : '');
+  e.classList.add('show');
+}
+function g(id){ return document.getElementById(id); }
+
+try{
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(SKY);
+  scene.fog = new THREE.Fog(SKY, 160, 420);
+
+  var camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 700);
+  camera.position.set(0, 9, 30);
+
+  var renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;   /* r147 API */
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.localClippingEnabled = true;   /* v11: 邻栋地面裁切需要 */
+  g('app').appendChild(renderer.domElement);
+
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 2, 0);
+  controls.maxPolarAngle = Math.PI / 2.05;
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.update();
+
+  var sun = new THREE.DirectionalLight(0xffffff, 1.15);
+  sun.position.set(40, 60, 30);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -70; sun.shadow.camera.right = 70;
+  sun.shadow.camera.top = 70;   sun.shadow.camera.bottom = -70;
+  sun.shadow.camera.near = 1;   sun.shadow.camera.far = 260;
+  sun.shadow.camera.updateProjectionMatrix();
+  scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0xcfe8ff, 0xb0a890, 0.85));
+
+  /* v11 修正：邻栋（游戏原版）各自把“街道铺装/红砖”烘焙进同一网格，7 栋叠在本页单一地面之上，
+     造成“地板层次乱”。这里用水平裁切面把邻栋 y<0.06 的烘焙地面削掉，只保留本页一层地面。
+     只作用于邻栋，不动 06 槽位资产。 */
+  /* v12 修正：直接删几何。邻栋把砖砌人行道/街面烘焙进单一网格（顶点色），
+     位于 y≈0.2 的水平面。按“面法线朝上 + 顶面高度<0.45”删三角形，只去烘焙街面，
+     保留墙体/树木/招牌/伞。仅作用于邻栋，不动 06 槽位资产。 */
+  /* v14：邻栋 glTF 未带 metallicRoughness 贴图，metalness 默认=1；
+     纯金属无环境贴图时背离太阳的立面渲染为近黑。metalness 归零恢复漫反射。 */
+  function fixMetal(root){
+    root.traverse(function(o){
+      if(!o.isMesh) return;
+      var ms = Array.isArray(o.material) ? o.material : [o.material];
+      for(var i=0;i<ms.length;i++){ var m=ms[i]; if(!m) continue;
+        if(m.metalness !== undefined) m.metalness = 0.0;
+        m.needsUpdate = true;
+      }
+    });
+  }
+  function stripLowGround(root){
+    root.traverse(function(o){
+      if(!o.isMesh || !o.geometry) return;
+      var geo=o.geometry, pos=geo.attributes.position; if(!pos) return;
+      var col=geo.attributes.color, nor=geo.attributes.normal, idx=geo.index;
+      var triCount = idx ? (idx.count/3|0) : (pos.count/3|0);
+      var kp=[],kc=[],kn=[];
+      function push(i){
+        kp.push(pos.getX(i),pos.getY(i),pos.getZ(i));
+        if(col) kc.push(col.getX(i),col.getY(i),col.getZ(i));
+        if(nor) kn.push(nor.getX(i),nor.getY(i),nor.getZ(i));
+      }
+      for(var t3=0;t3<triCount;t3++){
+        var a=idx?idx.getX(t3*3):t3*3, b=idx?idx.getX(t3*3+1):t3*3+1, c=idx?idx.getX(t3*3+2):t3*3+2;
+        var ya=pos.getY(a), yb=pos.getY(b), yc=pos.getY(c);
+        var maxy = ya>yb?(ya>yc?ya:yc):(yb>yc?yb:yc);
+        var ux=pos.getX(b)-pos.getX(a), uy=yb-ya, uz=pos.getZ(b)-pos.getZ(a);
+        var vx=pos.getX(c)-pos.getX(a), vy=yc-ya, vz=pos.getZ(c)-pos.getZ(a);
+        var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+        var nl=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+        var up=Math.abs(ny)/nl;
+        if(maxy < 0.45 && up > 0.5){
+          var gr=1,gg=1,gb2=1;
+          if(col){ gr=(col.getX(a)+col.getX(b)+col.getX(c))/3;
+                   gg=(col.getY(a)+col.getY(b)+col.getY(c))/3;
+                   gb2=(col.getZ(a)+col.getZ(b)+col.getZ(c))/3; }
+          /* v13：只删“砖色”地面(暖色 r-b>0.15)，保留灰路面与绿色绿化 */
+          if((gr-gb2) > 0.15 && gr > 0.45 && (gr-gg) > -0.06) continue;
+        }
+        push(a); push(b); push(c);
+      }
+      var ng=new THREE.BufferGeometry();
+      ng.setAttribute('position', new THREE.Float32BufferAttribute(kp,3));
+      if(kc.length) ng.setAttribute('color', new THREE.Float32BufferAttribute(kc,3));
+      if(kn.length) ng.setAttribute('normal', new THREE.Float32BufferAttribute(kn,3));
+      else ng.computeVertexNormals();
+      ng.computeBoundingSphere();
+      o.geometry = ng;
+    });
+  }
+
+  var GROUND_CLIP = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.06);
+  function clipGround(root){
+    root.traverse(function(o){
+      if(!o.isMesh) return;
+      var ms = Array.isArray(o.material) ? o.material : [o.material];
+      for(var i=0;i<ms.length;i++){ var m=ms[i]; if(!m) continue;
+        m.clippingPlanes = [GROUND_CLIP]; m.clipShadows = true; m.needsUpdate = true; }
+    });
+  }
+
+  /* 中性基线地面：不再覆盖邻栋自带铺装（v5~v9 覆盖方案实测更糟，已回退） */
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(400, 300),
+    new THREE.MeshStandardMaterial({ color:0xb0b6ba, roughness:1 })
+  );
+  ground.rotation.x = -Math.PI/2;
+  ground.position.y = -0.05;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  var loader = new THREE.GLTFLoader();
+  var BRICKY = /brick|tile|pavement|terracotta|cobble|flagstone|\bpav\b/i;
+  function shade(root){
+    root.traverse(function(o){
+      if(!o.isMesh) return;
+      o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
+      var mats = Array.isArray(o.material) ? o.material : [o.material];
+      for(var i=0;i<mats.length;i++){
+        var m = mats[i]; if(!m) continue;
+        var nm = ((m.name||'') + ' ' + ((m.map && m.map.name) || '')).toLowerCase();
+        if(BRICKY.test(nm)){
+          m.map = null;
+          if(m.color) m.color.setHex(0x9aa0a6);
+          m.needsUpdate = true;
+        }
+      }
+    });
+  }
+  function slotGroupOf(def){
+    var gr = new THREE.Group();
+    gr.position.set(def.x, 0, def.z);
+    gr.rotation.y = def.rot;
+    gr.scale.setScalar(GAME_SCALE);
+    return gr;
+  }
+
+  var TOTAL = 1 + NEIGHBOURS.length;
+  var pending = TOTAL;
+  function step(){
+    pending = Math.max(0, pending - 1);
+    var doneN = TOTAL - pending;
+    g('loadFill').style.width = Math.round(doneN / TOTAL * 100) + '%';
+    g('loadN').textContent = doneN + ' / ' + TOTAL;
+    if(pending === 0) g('load').classList.add('done');
+  }
+
+  NEIGHBOURS.forEach(function(def){
+    var holder = slotGroupOf(def);
+    scene.add(holder);
+    loader.load(def.url, function(gltf){
+      shade(gltf.scene); stripLowGround(gltf.scene); fixMetal(gltf.scene); holder.add(gltf.scene); step();
+    }, undefined, function(){ step(); });
+  });
+
+  /* 06 槽位 */
+  var slot = new THREE.Group();
+  slot.position.set(SLOT.x, 0, SLOT.z);
+  slot.rotation.y = SLOT.rot;
+  scene.add(slot);
+
+  var holder = new THREE.Group();
+  slot.add(holder);
+  var rotNudge = 0;
+  function applyNudge(){ slot.rotation.y = SLOT.rot + rotNudge; }
+
+  function fitAsset(root){
+    var kill = [];
+    root.traverse(function(o){ if(o.isMesh && isClutter(o.name)) kill.push(o); });
+    kill.forEach(function(o){ if(o.parent) o.parent.remove(o); });
+
+    var box = new THREE.Box3().setFromObject(root);
+    var size = box.getSize(new THREE.Vector3());
+    if(size.y > 0.001){
+      root.scale.multiplyScalar(TARGET_H / size.y);
+      box = new THREE.Box3().setFromObject(root);
+    }
+    var c = box.getCenter(new THREE.Vector3());
+    root.position.x -= c.x;
+    root.position.z -= c.z;
+    root.position.y -= box.min.y;
+  }
+
+  function clearHolder(){
+    holder.traverse(function(o){ if(o.isMesh && o.geometry) o.geometry.dispose(); });
+    slot.remove(holder);
+    holder = new THREE.Group();
+    slot.add(holder);
+  }
+
+  function mount(mode){
+    clearHolder();
+    var url = SRC[mode] || SRC.mine;
+    loader.load(url, function(gltf){
+      var root = gltf.scene;
+      if(mode === 'mine'){
+        fitAsset(root);
+        g('hudMode').innerHTML = '<span class="tag">我的资产</span> store_v2.glb';
+      }else{
+        root.scale.setScalar(GAME_SCALE);
+        g('hudMode').innerHTML = '<span class="tag alt">游戏原版</span> store_04.glb';
+      }
+      shade(root);
+      fixMetal(root);
+      holder.add(root);
+      step();
+      setBtn('bMine', mode === 'mine');
+      setBtn('bGame', mode === 'game');
+    }, undefined, function(){
+      fail('06 槽位模型载入失败：' + url);
+      step();
+    });
+  }
+
+  var VIEWS = {
+    street: { pos:[0, 9, 30],      tgt:[0, 3, 0]    },
+    top:    { pos:[0, 95, 4],      tgt:[0, 0, 4]    },
+    close:  { pos:[6, 9, 46],      tgt:[-15, 4.5, 22] }
+  };
+  function setCam(v){
+    camera.position.set(v.pos[0], v.pos[1], v.pos[2]);
+    controls.target.set(v.tgt[0], v.tgt[1], v.tgt[2]);
+    controls.update();
+  }
+  function setBtn(id, on){ g(id).classList.toggle('on', !!on); }
+
+  g('bStreet').addEventListener('click', function(){
+    setCam(VIEWS.street); setBtn('bStreet', 1); setBtn('bTop', 0); setBtn('bClose', 0);
+  });
+  g('bTop').addEventListener('click', function(){
+    setCam(VIEWS.top); setBtn('bTop', 1); setBtn('bStreet', 0); setBtn('bClose', 0);
+  });
+  g('bClose').addEventListener('click', function(){
+    setCam(VIEWS.close); setBtn('bClose', 1); setBtn('bStreet', 0); setBtn('bTop', 0);
+  });
+  g('bMine').addEventListener('click', function(){ mount('mine'); });
+  g('bGame').addEventListener('click', function(){ mount('game'); });
+  g('bRotL').addEventListener('click', function(){ rotNudge -= Math.PI/2; applyNudge(); });
+  g('bRotR').addEventListener('click', function(){ rotNudge += Math.PI/2; applyNudge(); });
+
+  addEventListener('resize', function(){
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  setTimeout(function(){ g('load').classList.add('done'); }, 20000);
+
+  applyNudge();
+  mount('mine');
+
+  (function loop(){
+    requestAnimationFrame(loop);
+    controls.update();
+    renderer.render(scene, camera);
+  })();
+}catch(e){
+  fail('街景初始化失败。', e && e.message);
+}
+})();
+</script>
+</body>
+</html>
