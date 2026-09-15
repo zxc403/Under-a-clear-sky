@@ -72,7 +72,7 @@
 
 <section class="panel hud" aria-label="场景说明">
   <h1>晴空之下 · 06 号便利店</h1>
-  <p class="sub">v13 · 只剔除邻栋红砖铺装（暖色识别），保留路面与绿化</p>
+  <p class="sub">v14 · 修复邻栋金属材质(metalness→0)，红砖铺装仍按暖色剔除</p>
   <dl>
     <dt>场景</dt><dd>主街（沿 Z 轴，两侧 x=±15）</dd>
     <dt>06 槽位</dt><dd>x −15 · z 22 · 朝向 −90°</dd>
@@ -199,6 +199,18 @@ try{
   /* v12 修正：直接删几何。邻栋把砖砌人行道/街面烘焙进单一网格（顶点色），
      位于 y≈0.2 的水平面。按“面法线朝上 + 顶面高度<0.45”删三角形，只去烘焙街面，
      保留墙体/树木/招牌/伞。仅作用于邻栋，不动 06 槽位资产。 */
+  /* v14：邻栋 glTF 未带 metallicRoughness 贴图，metalness 默认=1；
+     纯金属无环境贴图时背离太阳的立面渲染为近黑。metalness 归零恢复漫反射。 */
+  function fixMetal(root){
+    root.traverse(function(o){
+      if(!o.isMesh) return;
+      var ms = Array.isArray(o.material) ? o.material : [o.material];
+      for(var i=0;i<ms.length;i++){ var m=ms[i]; if(!m) continue;
+        if(m.metalness !== undefined) m.metalness = 0.0;
+        m.needsUpdate = true;
+      }
+    });
+  }
   function stripLowGround(root){
     root.traverse(function(o){
       if(!o.isMesh || !o.geometry) return;
@@ -300,7 +312,7 @@ try{
     var holder = slotGroupOf(def);
     scene.add(holder);
     loader.load(def.url, function(gltf){
-      shade(gltf.scene); stripLowGround(gltf.scene); holder.add(gltf.scene); step();
+      shade(gltf.scene); stripLowGround(gltf.scene); fixMetal(gltf.scene); holder.add(gltf.scene); step();
     }, undefined, function(){ step(); });
   });
 
@@ -352,6 +364,7 @@ try{
         g('hudMode').innerHTML = '<span class="tag alt">游戏原版</span> store_04.glb';
       }
       shade(root);
+      fixMetal(root);
       holder.add(root);
       step();
       setBtn('bMine', mode === 'mine');
